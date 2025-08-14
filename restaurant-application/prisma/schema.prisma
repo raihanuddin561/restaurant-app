@@ -1,0 +1,425 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Core Authentication & User Management
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  password     String
+  name         String
+  role         UserRole @default(EMPLOYEE)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  employeeProfile Employee?
+  createdOrders   Order[]
+  createdSales    Sale[]
+  inventoryLogs   InventoryLog[]
+
+  @@map("users")
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  EMPLOYEE
+  CUSTOMER
+}
+
+// Partnership Management
+model Partner {
+  id          String  @id @default(cuid())
+  name        String
+  sharePercent Float   // 40.0 or 60.0
+  email       String  @unique
+  phone       String?
+  address     String?
+  isActive    Boolean @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  profitShares ProfitShare[]
+
+  @@map("partners")
+}
+
+model ProfitShare {
+  id        String   @id @default(cuid())
+  partnerId String
+  period    DateTime // Monthly period
+  revenue   Float
+  expenses  Float
+  profit    Float
+  share     Float
+  createdAt DateTime @default(now())
+
+  // Relations
+  partner Partner @relation(fields: [partnerId], references: [id])
+
+  @@map("profit_shares")
+}
+
+// Employee Management
+model Employee {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  employeeId  String   @unique
+  position    String
+  department  String
+  salary      Float
+  hourlyRate  Float?
+  hireDate    DateTime
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  user       User         @relation(fields: [userId], references: [id])
+  attendance Attendance[]
+  payrolls   Payroll[]
+
+  @@map("employees")
+}
+
+model Attendance {
+  id         String    @id @default(cuid())
+  employeeId String
+  date       DateTime
+  checkIn    DateTime?
+  checkOut   DateTime?
+  totalHours Float?
+  overtimeHours Float?
+  createdAt  DateTime  @default(now())
+
+  // Relations
+  employee Employee @relation(fields: [employeeId], references: [id])
+
+  @@map("attendance")
+}
+
+model Payroll {
+  id           String   @id @default(cuid())
+  employeeId   String
+  period       DateTime
+  basicSalary  Float
+  overtime     Float    @default(0)
+  bonuses      Float    @default(0)
+  deductions   Float    @default(0)
+  totalAmount  Float
+  status       PayrollStatus @default(PENDING)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  employee Employee @relation(fields: [employeeId], references: [id])
+
+  @@map("payrolls")
+}
+
+enum PayrollStatus {
+  PENDING
+  APPROVED
+  PAID
+}
+
+// Inventory Management
+model Category {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  description String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  items    Item[]
+  menuItems MenuItem[]
+
+  @@map("categories")
+}
+
+model Supplier {
+  id          String   @id @default(cuid())
+  name        String
+  contactName String?
+  email       String?
+  phone       String?
+  address     String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  items      Item[]
+  purchases  Purchase[]
+
+  @@map("suppliers")
+}
+
+model Item {
+  id            String   @id @default(cuid())
+  name          String
+  categoryId    String
+  supplierId    String?
+  sku           String   @unique
+  description   String?
+  unit          String   // kg, piece, liter, etc.
+  costPrice     Float
+  sellingPrice  Float?
+  reorderLevel  Float
+  currentStock  Float    @default(0)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  category      Category       @relation(fields: [categoryId], references: [id])
+  supplier      Supplier?      @relation(fields: [supplierId], references: [id])
+  inventoryLogs InventoryLog[]
+  purchaseItems PurchaseItem[]
+  menuItems     MenuItem[]
+  orderItems    OrderItem[]
+
+  @@map("items")
+}
+
+model InventoryLog {
+  id          String          @id @default(cuid())
+  itemId      String
+  userId      String
+  type        InventoryLogType
+  quantity    Float
+  previousStock Float
+  newStock    Float
+  reason      String?
+  reference   String?         // Purchase ID, Sale ID, etc.
+  createdAt   DateTime        @default(now())
+
+  // Relations
+  item Item @relation(fields: [itemId], references: [id])
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("inventory_logs")
+}
+
+enum InventoryLogType {
+  STOCK_IN
+  STOCK_OUT
+  ADJUSTMENT
+  WASTE
+}
+
+// Purchase Management
+model Purchase {
+  id             String   @id @default(cuid())
+  supplierId     String
+  purchaseNumber String   @unique
+  purchaseDate   DateTime
+  totalAmount    Float
+  status         PurchaseStatus @default(PENDING)
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  supplier      Supplier       @relation(fields: [supplierId], references: [id])
+  purchaseItems PurchaseItem[]
+
+  @@map("purchases")
+}
+
+model PurchaseItem {
+  id           String   @id @default(cuid())
+  purchaseId   String
+  itemId       String
+  quantity     Float
+  unitPrice    Float
+  totalPrice   Float
+  createdAt    DateTime @default(now())
+
+  // Relations
+  purchase Purchase @relation(fields: [purchaseId], references: [id])
+  item     Item     @relation(fields: [itemId], references: [id])
+
+  @@map("purchase_items")
+}
+
+enum PurchaseStatus {
+  PENDING
+  RECEIVED
+  CANCELLED
+}
+
+// Menu Management
+model MenuItem {
+  id           String   @id @default(cuid())
+  name         String
+  categoryId   String
+  description  String?
+  price        Float
+  costPrice    Float    // Calculated from ingredients
+  isAvailable  Boolean  @default(true)
+  isActive     Boolean  @default(true)
+  image        String?
+  prepTime     Int?     // in minutes
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  category    Category    @relation(fields: [categoryId], references: [id])
+  ingredients Item[]      // Many-to-many for recipe ingredients
+  orderItems  OrderItem[]
+
+  @@map("menu_items")
+}
+
+// Order Management (Customer Orders)
+model Order {
+  id           String      @id @default(cuid())
+  orderNumber  String      @unique
+  customerId   String?     // Optional for walk-in customers
+  userId       String      // Staff who created the order
+  orderType    OrderType
+  status       OrderStatus @default(PENDING)
+  tableNumber  String?
+  totalAmount  Float
+  taxAmount    Float       @default(0)
+  discountAmount Float     @default(0)
+  finalAmount  Float
+  notes        String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  // Relations
+  user       User        @relation(fields: [userId], references: [id])
+  orderItems OrderItem[]
+  sale       Sale?
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id         String   @id @default(cuid())
+  orderId    String
+  menuItemId String?  // For menu items
+  itemId     String?  // For direct items
+  quantity   Float
+  unitPrice  Float
+  totalPrice Float
+  notes      String?
+  createdAt  DateTime @default(now())
+
+  // Relations
+  order    Order     @relation(fields: [orderId], references: [id])
+  menuItem MenuItem? @relation(fields: [menuItemId], references: [id])
+  item     Item?     @relation(fields: [itemId], references: [id])
+
+  @@map("order_items")
+}
+
+enum OrderType {
+  DINE_IN
+  TAKEAWAY
+  DELIVERY
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PREPARING
+  READY
+  SERVED
+  COMPLETED
+  CANCELLED
+}
+
+// Sales & Revenue Management
+model Sale {
+  id            String      @id @default(cuid())
+  orderId       String?     @unique
+  saleNumber    String      @unique
+  userId        String
+  saleDate      DateTime
+  totalAmount   Float
+  taxAmount     Float       @default(0)
+  discountAmount Float      @default(0)
+  finalAmount   Float
+  paymentMethod PaymentMethod
+  status        SaleStatus  @default(COMPLETED)
+  notes         String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  // Relations
+  order Order? @relation(fields: [orderId], references: [id])
+  user  User   @relation(fields: [userId], references: [id])
+
+  @@map("sales")
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  DIGITAL_WALLET
+  BANK_TRANSFER
+}
+
+enum SaleStatus {
+  COMPLETED
+  REFUNDED
+  CANCELLED
+}
+
+// Expense Management
+model ExpenseCategory {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  description String?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  expenses Expense[]
+
+  @@map("expense_categories")
+}
+
+model Expense {
+  id                String          @id @default(cuid())
+  expenseCategoryId String
+  description       String
+  amount            Float
+  expenseDate       DateTime
+  receiptImage      String?
+  notes             String?
+  status            ExpenseStatus   @default(APPROVED)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  // Relations
+  expenseCategory ExpenseCategory @relation(fields: [expenseCategoryId], references: [id])
+
+  @@map("expenses")
+}
+
+enum ExpenseStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
