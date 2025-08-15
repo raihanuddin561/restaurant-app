@@ -7,12 +7,13 @@ import {
   TrendingDown,
   AlertTriangle
 } from 'lucide-react'
+import { formatCurrency, formatDateTime } from '@/lib/utils'
 
 // Mock data - will be replaced with real database queries
 const stats = [
   {
     name: 'Total Revenue Today',
-    value: '$2,350',
+    value: formatCurrency(4250),
     change: '+12.5%',
     changeType: 'increase' as const,
     icon: DollarSign,
@@ -41,10 +42,10 @@ const stats = [
 ]
 
 const recentOrders = [
-  { id: '#1234', customer: 'John Doe', amount: '$23.50', status: 'Completed', time: '2 min ago' },
-  { id: '#1235', customer: 'Jane Smith', amount: '$45.75', status: 'Preparing', time: '5 min ago' },
-  { id: '#1236', customer: 'Walk-in', amount: '$12.25', status: 'Ready', time: '8 min ago' },
-  { id: '#1237', customer: 'Mike Johnson', amount: '$67.80', status: 'Confirmed', time: '12 min ago' },
+  { id: '#1234', customer: 'John Doe', amount: formatCurrency(425), status: 'Completed', time: '2 min ago' },
+  { id: '#1235', customer: 'Jane Smith', amount: formatCurrency(825), status: 'Preparing', time: '5 min ago' },
+  { id: '#1236', customer: 'Walk-in', amount: formatCurrency(220), status: 'Ready', time: '8 min ago' },
+  { id: '#1237', customer: 'Mike Johnson', amount: formatCurrency(1220), status: 'Confirmed', time: '12 min ago' },
 ]
 
 const lowStockItems = [
@@ -183,26 +184,26 @@ export default function DashboardPage() {
           <h3 className="text-lg font-medium leading-6 text-gray-900 mb-4">Partnership Summary (This Month)</h3>
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
             <div className="text-center">
-              <p className="text-2xl font-bold text-gray-900">$12,450</p>
+              <p className="text-2xl font-bold text-gray-900">{formatCurrency(124500)}</p>
               <p className="text-sm text-gray-500">Total Revenue</p>
             </div>
             <div className="text-center">
-              <p className="text-2xl font-bold text-gray-900">$8,230</p>
+              <p className="text-2xl font-bold text-gray-900">{formatCurrency(82300)}</p>
               <p className="text-sm text-gray-500">Total Expenses</p>
             </div>
             <div className="text-center">
-              <p className="text-2xl font-bold text-green-600">$4,220</p>
+              <p className="text-2xl font-bold text-green-600">{formatCurrency(42200)}</p>
               <p className="text-sm text-gray-500">Net Profit</p>
             </div>
           </div>
           <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="bg-blue-50 rounded-lg p-4">
-              <p className="text-sm font-medium text-blue-900">Partner 1 (60%)</p>
-              <p className="text-lg font-bold text-blue-900">$2,532</p>
+              <p className="text-sm font-medium text-blue-900">Partner A (60%)</p>
+              <p className="text-lg font-bold text-blue-900">{formatCurrency(2532)}</p>
             </div>
             <div className="bg-green-50 rounded-lg p-4">
-              <p className="text-sm font-medium text-green-900">Partner 2 (40%)</p>
-              <p className="text-lg font-bold text-green-900">$1,688</p>
+              <p className="text-sm font-medium text-green-900">Partner B (40%)</p>
+              <p className="text-lg font-bold text-green-900">{formatCurrency(1688)}</p>
             </div>
           </div>
         </div>
