@@ -9,7 +9,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -178,7 +178,11 @@ model Item {
   supplierId    String?
   sku           String   @unique
   description   String?
+  specification String?  // e.g., "Ribeye Cut", "Basmati Premium", "Organic"
+  brand         String?  // e.g., "Tilda", "Uncle Ben's", "Local Farm"
+  grade         String?  // e.g., "Grade A", "Premium", "Standard"
   unit          String   // kg, piece, liter, etc.
+  packSize      String?  // e.g., "25kg bag", "1kg pack", "500g"
   costPrice     Float
   sellingPrice  Float?
   reorderLevel  Float

@@ -235,6 +235,13 @@ export default async function InventoryPage() {
             </div>
             <div className="flex space-x-3">
               <Link
+                href="/inventory/categories"
+                className="inline-flex items-center px-4 py-2 border border-purple-300 text-sm font-medium rounded-lg text-purple-700 bg-white hover:bg-purple-50 transition-colors duration-200"
+              >
+                <Package className="w-4 h-4 mr-2" />
+                Manage Categories
+              </Link>
+              <Link
                 href="/inventory/add"
                 className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 transition-colors duration-200"
               >
