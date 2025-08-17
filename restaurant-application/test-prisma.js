@@ -4,14 +4,32 @@ async function main() {
   const prisma = new PrismaClient()
   
   try {
-    console.log('Testing Prisma connection...')
+    console.log('Testing Prisma connection and Item structure...')
     
-    // Test simple query
-    const users = await prisma.user.findMany()
-    console.log('Users found:', users.length)
+    // Test items with full structure
+    const items = await prisma.item.findMany({
+      take: 1,
+      include: {
+        category: {
+          select: {
+            name: true
+          }
+        },
+        supplier: {
+          select: {
+            name: true,
+            phone: true,
+            email: true
+          }
+        }
+      }
+    })
     
-    const items = await prisma.item.findMany()
     console.log('Items found:', items.length)
+    if (items.length > 0) {
+      console.log('First item structure:', JSON.stringify(items[0], null, 2))
+      console.log('Has unit field?', 'unit' in items[0])
+    }
     
     console.log('✅ Prisma connection successful!')
   } catch (error) {

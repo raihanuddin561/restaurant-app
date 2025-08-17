@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { ArrowLeft, Plus, Minus, ShoppingCart, Users, MapPin, CreditCard } from 'lucide-react'
 import Link from 'next/link'
 import { formatCurrency } from '@/lib/utils'
+import { useNotification, Notification } from '@/components/ui/Notification'
 
 interface MenuItem {
   id: string
@@ -85,6 +86,7 @@ export default function NewOrderPage() {
   const [customerName, setCustomerName] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
   const [notes, setNotes] = useState('')
+  const { showNotification, notification, clearNotification } = useNotification()
 
   // Filter menu items
   const filteredMenuItems = menuItems.filter(item => {
@@ -158,7 +160,7 @@ export default function NewOrderPage() {
     
     console.log('Submitting order:', orderData)
     // TODO: Submit to API
-    alert('Order submitted successfully!')
+    showNotification('success', 'Order submitted successfully! The order has been sent to the kitchen.', 'Order Confirmed')
   }
 
   return (
@@ -411,6 +413,16 @@ export default function NewOrderPage() {
           </div>
         </div>
       </div>
+
+      {/* Notification */}
+      {notification && (
+        <Notification
+          type={notification.type}
+          title={notification.title}
+          message={notification.message}
+          onClose={clearNotification}
+        />
+      )}
     </div>
   )
 }

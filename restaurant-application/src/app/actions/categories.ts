@@ -105,74 +105,222 @@ export async function updateCategory(formData: FormData) {
   }
 }
 
-export async function toggleCategoryStatus(formData: FormData) {
+export async function deleteCategory(categoryId: string) {
   try {
-    const id = formData.get('id') as string
-    const currentStatus = formData.get('currentStatus') === 'true'
-
-    if (!id) {
-      throw new Error('Category ID is required')
+    // Input validation
+    if (!categoryId || typeof categoryId !== 'string') {
+      return { 
+        success: false, 
+        message: 'Invalid category ID provided. Please refresh the page and try again.' 
+      }
     }
 
-    // Toggle the category status
-    await prisma.category.update({
-      where: { id },
-      data: {
-        isActive: !currentStatus
+    if (categoryId.length < 1) {
+      return { 
+        success: false, 
+        message: 'Category ID cannot be empty.' 
+      }
+    }
+
+    // Check if category exists and get related data
+    const existingCategory = await prisma.category.findUnique({
+      where: { id: categoryId },
+      include: {
+        items: {
+          select: {
+            id: true,
+            name: true,
+            isActive: true
+          }
+        },
+        menuItems: {
+          select: {
+            id: true,
+            name: true,
+            isActive: true
+          }
+        }
       }
     })
 
-    // Revalidate the pages that show categories
+    if (!existingCategory) {
+      return { 
+        success: false, 
+        message: 'This category no longer exists. It may have already been deleted by another user.' 
+      }
+    }
+
+    // Check if category is already inactive
+    if (!existingCategory.isActive) {
+      return { 
+        success: false, 
+        message: 'This category is already deactivated.' 
+      }
+    }
+
+    // Check if category has related records
+    const hasItems = existingCategory.items.length > 0
+    const hasMenuItems = existingCategory.menuItems.length > 0
+    const hasRelatedRecords = hasItems || hasMenuItems
+
+    if (hasRelatedRecords) {
+      // Soft delete - mark as inactive instead of hard delete
+      const updatedCategory = await prisma.category.update({
+        where: { id: categoryId },
+        data: {
+          isActive: false,
+          updatedAt: new Date()
+        }
+      })
+
+      // Revalidate pages
+      revalidatePath('/inventory/categories')
+      revalidatePath('/inventory/add')
+      revalidatePath('/inventory')
+
+      const relatedRecordsText = [
+        hasItems && `${existingCategory.items.length} inventory items`,
+        hasMenuItems && `${existingCategory.menuItems.length} menu items`
+      ].filter(Boolean).join(', ')
+
+      return { 
+        success: true, 
+        message: `Category "${existingCategory.name}" has been deactivated because it has related records (${relatedRecordsText}). You can reactivate it later if needed.`,
+        isDeactivated: true
+      }
+    } else {
+      // Hard delete if no related records
+      try {
+        await prisma.category.delete({
+          where: { id: categoryId }
+        })
+      } catch (deleteError: any) {
+        if (deleteError?.code === 'P2003') {
+          // Foreign key constraint error - there are related records we didn't detect
+          return { 
+            success: false, 
+            message: 'Cannot delete category because it has related records. Please try deactivating it instead.' 
+          }
+        }
+        throw deleteError
+      }
+
+      // Revalidate pages
+      revalidatePath('/inventory/categories')
+      revalidatePath('/inventory/add')
+      revalidatePath('/inventory')
+
+      return { 
+        success: true, 
+        message: `Category "${existingCategory.name}" has been permanently deleted.`,
+        isDeactivated: false
+      }
+    }
+  } catch (error: any) {
+    console.error('Delete category error:', error)
+    
+    // Handle specific database errors
+    if (error?.code === 'P2025') {
+      return { 
+        success: false, 
+        message: 'Category not found. It may have already been deleted.' 
+      }
+    } else if (error?.code === 'P2003') {
+      return { 
+        success: false, 
+        message: 'Cannot delete category because it has related records. Please deactivate it instead.' 
+      }
+    } else if (error?.code === 'P1001') {
+      return { 
+        success: false, 
+        message: 'Database connection failed. Please try again in a moment.' 
+      }
+    } else if (error?.message?.includes('timeout')) {
+      return { 
+        success: false, 
+        message: 'Operation timed out. Please check your connection and try again.' 
+      }
+    } else {
+      return { 
+        success: false, 
+        message: error instanceof Error ? 
+          `Operation failed: ${error.message}` : 
+          'An unexpected error occurred. Please try again or contact support if the problem persists.'
+      }
+    }
+  }
+}
+
+export async function toggleCategoryStatus(categoryId: string) {
+  try {
+    // Input validation
+    if (!categoryId || typeof categoryId !== 'string') {
+      return { 
+        success: false, 
+        message: 'Invalid category ID provided. Please refresh the page and try again.' 
+      }
+    }
+
+    // Get current category status
+    const existingCategory = await prisma.category.findUnique({
+      where: { id: categoryId }
+    })
+
+    if (!existingCategory) {
+      return { 
+        success: false, 
+        message: 'This category no longer exists. It may have been deleted by another user.' 
+      }
+    }
+
+    const newStatus = !existingCategory.isActive
+    const actionText = newStatus ? 'activated' : 'deactivated'
+
+    // Toggle the status
+    const updatedCategory = await prisma.category.update({
+      where: { id: categoryId },
+      data: {
+        isActive: newStatus,
+        updatedAt: new Date()
+      }
+    })
+
+    // Revalidate pages
     revalidatePath('/inventory/categories')
     revalidatePath('/inventory/add')
     revalidatePath('/inventory')
 
     return { 
       success: true, 
-      message: `Category ${!currentStatus ? 'activated' : 'deactivated'} successfully!` 
+      message: `"${existingCategory.name}" has been successfully ${actionText}.`,
+      isActive: updatedCategory.isActive
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Toggle category status error:', error)
-    return { 
-      success: false, 
-      message: error instanceof Error ? error.message : 'Failed to update category status' 
-    }
-  }
-}
-
-export async function deleteCategory(formData: FormData) {
-  try {
-    const id = formData.get('id') as string
-
-    if (!id) {
-      throw new Error('Category ID is required')
-    }
-
-    // Check if category has items
-    const itemCount = await prisma.item.count({
-      where: { categoryId: id }
-    })
-
-    if (itemCount > 0) {
-      throw new Error('Cannot delete category that contains items. Please move or delete the items first.')
-    }
-
-    // Delete the category
-    await prisma.category.delete({
-      where: { id }
-    })
-
-    // Revalidate the pages that show categories
-    revalidatePath('/inventory/categories')
-    revalidatePath('/inventory/add')
-    revalidatePath('/inventory')
-
-    return { success: true, message: 'Category deleted successfully!' }
-  } catch (error) {
-    console.error('Delete category error:', error)
-    return { 
-      success: false, 
-      message: error instanceof Error ? error.message : 'Failed to delete category' 
+    
+    // Handle specific database errors
+    if (error?.code === 'P2025') {
+      return { 
+        success: false, 
+        message: 'Category not found. It may have already been deleted.' 
+      }
+    } else if (error?.code === 'P1001') {
+      return { 
+        success: false, 
+        message: 'Database connection failed. Please try again in a moment.' 
+      }
+    } else if (error?.message?.includes('timeout')) {
+      return { 
+        success: false, 
+        message: 'Operation timed out. Please check your connection and try again.' 
+      }
+    } else {
+      return { 
+        success: false, 
+        message: error instanceof Error ? 
+          `Status update failed: ${error.message}` : 
+          'An unexpected error occurred while updating category status. Please try again.'
+      }
     }
   }
 }

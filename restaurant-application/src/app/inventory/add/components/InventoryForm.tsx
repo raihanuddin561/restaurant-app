@@ -3,6 +3,8 @@
 import { Save } from 'lucide-react'
 import { useFormStatus } from 'react-dom'
 import { createInventoryItem } from '@/app/actions/inventory'
+import { CustomUnitSelector } from '../../components/CustomUnitSelector'
+import { useState } from 'react'
 
 interface Category {
   id: string
@@ -34,21 +36,42 @@ function SubmitButton() {
   )
 }
 
-export function InventoryForm({ categories, suppliers }: InventoryFormProps) {
+'use client'
+
+import { useState } from 'react'
+import { createInventoryItem } from '@/app/actions/inventory'
+import { CustomUnitSelector } from '@/app/inventory/add/components/CustomUnitSelector'
+import { useNotification, Notification } from '@/components/ui/Notification'
+import { useRouter } from 'next/navigation'
+
+export default function InventoryForm() {
+  const [selectedUnit, setSelectedUnit] = useState('')
+  const { showNotification, notification, clearNotification } = useNotification()
+  const router = useRouter()
+
   const handleSubmit = async (formData: FormData) => {
+    // Add the selected unit to form data
+    if (selectedUnit) {
+      formData.set('unit', selectedUnit)
+    }
+    
     const result = await createInventoryItem(formData)
     
     if (result.success) {
-      alert('Item created successfully!')
-      window.location.href = '/inventory'
+      showNotification('success', 'Item created successfully! Redirecting to inventory page...', 'Success')
+      // Redirect after showing success message
+      setTimeout(() => {
+        router.push('/inventory')
+      }, 2000)
     } else {
-      alert(result.message)
+      showNotification('error', result.message, 'Error Creating Item')
     }
   }
 
   return (
-    <div className="space-y-6">
-      <form action={handleSubmit} className="space-y-6">
+    <>
+      <div className="space-y-6">
+        <form action={handleSubmit} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -85,23 +108,13 @@ export function InventoryForm({ categories, suppliers }: InventoryFormProps) {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Unit <span className="text-red-500">*</span>
             </label>
-            <select
-              name="unit"
+            <CustomUnitSelector
+              value={selectedUnit}
+              onChange={setSelectedUnit}
               required
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 bg-white"
-            >
-              <option value="">Select unit...</option>
-              <option value="kg">Kilograms (kg)</option>
-              <option value="g">Grams (g)</option>
-              <option value="L">Liters (L)</option>
-              <option value="ml">Milliliters (ml)</option>
-              <option value="pcs">Pieces (pcs)</option>
-              <option value="dozen">Dozen (dz)</option>
-              <option value="box">Box</option>
-              <option value="bag">Bag</option>
-              <option value="bottle">Bottle</option>
-              <option value="can">Can</option>
-            </select>
+            />
+            {/* Hidden input for form submission */}
+            <input type="hidden" name="unit" value={selectedUnit} />
           </div>
 
           <div>
@@ -255,5 +268,16 @@ export function InventoryForm({ categories, suppliers }: InventoryFormProps) {
         </div>
       </form>
     </div>
+
+    {/* Notification */}
+    {notification && (
+      <Notification
+        type={notification.type}
+        title={notification.title}
+        message={notification.message}
+        onClose={clearNotification}
+      />
+    )}
+  </>
   )
 }
