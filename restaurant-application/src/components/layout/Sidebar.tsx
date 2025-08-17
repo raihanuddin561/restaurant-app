@@ -30,7 +30,7 @@ export default function Sidebar() {
   return (
     <div className="flex h-full w-64 flex-col bg-gray-900">
       <div className="flex h-16 shrink-0 items-center px-4">
-        <h1 className="text-xl font-bold text-white">Restaurant Manager</h1>
+        <h1 className="text-xl font-bold text-white">Royal Food</h1>
       </div>
       <nav className="flex flex-1 flex-col">
         <ul role="list" className="flex flex-1 flex-col gap-y-7">

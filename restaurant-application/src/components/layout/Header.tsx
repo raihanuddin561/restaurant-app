@@ -32,7 +32,7 @@ export default function Header() {
           {/* Profile dropdown */}
           <div className="flex items-center gap-x-4 lg:gap-x-6">
             <div className="hidden lg:block lg:text-sm lg:font-semibold lg:leading-6 lg:text-gray-900">
-              Restaurant Manager
+              Royal Food Manager
             </div>
             <User className="h-8 w-8 rounded-full text-gray-400" />
           </div>

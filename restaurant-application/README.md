@@ -1,6 +1,6 @@
-# Restaurant Management System
+# Royal Food - Restaurant Management System
 
-A comprehensive restaurant management system built with Next.js, TypeScript, PostgreSQL, and Prisma ORM. This system helps restaurant owners track inventory, manage employees, process orders, calculate costs, and monitor partnership profits.
+A comprehensive restaurant management system built with Next.js, TypeScript, PostgreSQL, and Prisma ORM. Royal Food helps restaurant owners track inventory, manage employees, process orders, calculate costs, and monitor partnership profits.
 
 ## 🚀 Features
 
@@ -48,7 +48,7 @@ The system includes comprehensive database models for:
 1. **Clone the repository**
    ```bash
    git clone <repository-url>
-   cd restaurant-application
+   cd royal-food
    ```
 
 2. **Install dependencies**

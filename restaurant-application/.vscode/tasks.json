@@ -10,6 +10,16 @@
 				"$tsc"
 			],
 			"group": "build"
+		},
+		{
+			"label": "Setup Database",
+			"type": "shell",
+			"command": "npx prisma db push --accept-data-loss && npx prisma generate && npx tsx prisma/seed.ts"
+		},
+		{
+			"label": "Push Database Schema",
+			"type": "shell",
+			"command": "npx prisma db push --accept-data-loss"
 		}
 	]
 }

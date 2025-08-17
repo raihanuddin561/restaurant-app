@@ -8,61 +8,180 @@ import {
   AlertTriangle
 } from 'lucide-react'
 import { formatCurrency, formatDateTime } from '@/lib/utils'
+import { prisma } from '@/lib/prisma'
 
-// Mock data - will be replaced with real database queries
-const stats = [
-  {
-    name: 'Total Revenue Today',
-    value: formatCurrency(4250),
-    change: '+12.5%',
-    changeType: 'increase' as const,
-    icon: DollarSign,
-  },
-  {
-    name: 'Orders Today',
-    value: '47',
-    change: '+8.2%',
-    changeType: 'increase' as const,
-    icon: ShoppingCart,
-  },
-  {
-    name: 'Low Stock Items',
-    value: '12',
-    change: '+3',
-    changeType: 'decrease' as const,
-    icon: Package,
-  },
-  {
-    name: 'Active Employees',
-    value: '8',
-    change: '0%',
-    changeType: 'neutral' as const,
-    icon: Users,
-  },
-]
+// Get dashboard data from database
+async function getDashboardData() {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const tomorrow = new Date(today)
+  tomorrow.setDate(tomorrow.getDate() + 1)
 
-const recentOrders = [
-  { id: '#1234', customer: 'John Doe', amount: formatCurrency(425), status: 'Completed', time: '2 min ago' },
-  { id: '#1235', customer: 'Jane Smith', amount: formatCurrency(825), status: 'Preparing', time: '5 min ago' },
-  { id: '#1236', customer: 'Walk-in', amount: formatCurrency(220), status: 'Ready', time: '8 min ago' },
-  { id: '#1237', customer: 'Mike Johnson', amount: formatCurrency(1220), status: 'Confirmed', time: '12 min ago' },
-]
+  try {
+    // Get today's orders and sales
+    const [
+      todayOrders,
+      todaySales,
+      lowStockItems,
+      activeEmployees,
+      recentOrders,
+      monthlyData
+    ] = await Promise.all([
+      // Today's orders count
+      prisma.order.count({
+        where: {
+          createdAt: {
+            gte: today,
+            lt: tomorrow
+          }
+        }
+      }),
+      
+      // Today's sales total
+      prisma.sale.aggregate({
+        where: {
+          saleDate: {
+            gte: today,
+            lt: tomorrow
+          },
+          status: 'COMPLETED'
+        },
+        _sum: {
+          finalAmount: true
+        }
+      }),
+      
+      // Low stock items
+      prisma.item.findMany({
+        where: {
+          AND: [
+            {
+              currentStock: {
+                lte: 5 // Items with 5 or less stock
+              }
+            },
+            {
+              isActive: true
+            }
+          ]
+        },
+        select: {
+          name: true,
+          currentStock: true,
+          reorderLevel: true,
+          unit: true
+        },
+        take: 10
+      }),
+      
+      // Active employees count
+      prisma.employee.count({
+        where: {
+          isActive: true
+        }
+      }),
+      
+      // Recent orders
+      prisma.order.findMany({
+        take: 4,
+        orderBy: {
+          createdAt: 'desc'
+        },
+        include: {
+          user: {
+            select: {
+              name: true
+            }
+          }
+        }
+      }),
+      
+      // Monthly data for partnership
+      prisma.sale.aggregate({
+        where: {
+          saleDate: {
+            gte: new Date(today.getFullYear(), today.getMonth(), 1),
+            lt: new Date(today.getFullYear(), today.getMonth() + 1, 1)
+          },
+          status: 'COMPLETED'
+        },
+        _sum: {
+          finalAmount: true
+        }
+      })
+    ])
 
-const lowStockItems = [
-  { name: 'Chicken Breast', current: 2.5, reorder: 5, unit: 'kg' },
-  { name: 'Tomatoes', current: 1.2, reorder: 3, unit: 'kg' },
-  { name: 'Rice', current: 8, reorder: 10, unit: 'kg' },
-  { name: 'Cooking Oil', current: 0.5, reorder: 2, unit: 'L' },
-]
+    return {
+      todayOrders,
+      todayRevenue: todaySales._sum.finalAmount || 0,
+      lowStockItems,
+      activeEmployees,
+      recentOrders,
+      monthlyRevenue: monthlyData._sum.finalAmount || 0
+    }
+  } catch (error) {
+    console.error('Dashboard data fetch error:', error)
+    // Return default data if database fails
+    return {
+      todayOrders: 0,
+      todayRevenue: 0,
+      lowStockItems: [],
+      activeEmployees: 0,
+      recentOrders: [],
+      monthlyRevenue: 0
+    }
+  }
+}
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  const data = await getDashboardData()
+
+  const stats = [
+    {
+      name: 'Total Revenue Today',
+      value: formatCurrency(data.todayRevenue),
+      change: '+12.5%',
+      changeType: 'increase' as const,
+      icon: DollarSign,
+    },
+    {
+      name: 'Orders Today', 
+      value: data.todayOrders.toString(),
+      change: '+8.2%',
+      changeType: 'increase' as const,
+      icon: ShoppingCart,
+    },
+    {
+      name: 'Low Stock Items',
+      value: data.lowStockItems.length.toString(),
+      change: `${data.lowStockItems.length} items`,
+      changeType: 'decrease' as const,
+      icon: Package,
+    },
+    {
+      name: 'Active Employees',
+      value: data.activeEmployees.toString(),
+      change: '0%',
+      changeType: 'neutral' as const,
+      icon: Users,
+    },
+  ]
+
+  const recentOrders = data.recentOrders.map(order => ({
+    id: order.orderNumber,
+    customer: order.customerId || order.user?.name || 'Walk-in',
+    amount: formatCurrency(order.finalAmount),
+    status: order.status.replace('_', ' '), // Convert DINE_IN to DINE IN
+    time: formatDateTime(order.createdAt)
+  }))
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-gray-900">Dashboard</h1>
         <p className="mt-2 text-sm text-gray-700">
-          Overview of your restaurant operations
+          Overview of your Royal Food restaurant operations
         </p>
       </div>
 
@@ -129,11 +248,11 @@ export default function DashboardPage() {
                     <div className="flex items-center space-x-2">
                       <span
                         className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                          order.status === 'Completed'
+                          order.status === 'COMPLETED'
                             ? 'bg-green-100 text-green-800'
-                            : order.status === 'Preparing'
+                            : order.status === 'PREPARING'
                             ? 'bg-yellow-100 text-yellow-800'
-                            : order.status === 'Ready'
+                            : order.status === 'READY'
                             ? 'bg-blue-100 text-blue-800'
                             : 'bg-gray-100 text-gray-800'
                         }`}
@@ -157,17 +276,17 @@ export default function DashboardPage() {
               <h3 className="text-lg font-medium leading-6 text-gray-900">Low Stock Alert</h3>
             </div>
             <div className="space-y-4">
-              {lowStockItems.map((item, index) => (
+              {data.lowStockItems.map((item, index) => (
                 <div key={index} className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-900">{item.name}</p>
                     <p className="text-sm text-gray-500">
-                      Reorder level: {item.reorder} {item.unit}
+                      Reorder level: {item.reorderLevel} {item.unit}
                     </p>
                   </div>
                   <div className="text-right">
                     <p className="text-sm font-medium text-red-600">
-                      {item.current} {item.unit}
+                      {item.currentStock} {item.unit}
                     </p>
                     <p className="text-xs text-gray-500">remaining</p>
                   </div>
@@ -184,26 +303,26 @@ export default function DashboardPage() {
           <h3 className="text-lg font-medium leading-6 text-gray-900 mb-4">Partnership Summary (This Month)</h3>
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
             <div className="text-center">
-              <p className="text-2xl font-bold text-gray-900">{formatCurrency(124500)}</p>
+              <p className="text-2xl font-bold text-gray-900">{formatCurrency(data.monthlyRevenue)}</p>
               <p className="text-sm text-gray-500">Total Revenue</p>
             </div>
             <div className="text-center">
-              <p className="text-2xl font-bold text-gray-900">{formatCurrency(82300)}</p>
-              <p className="text-sm text-gray-500">Total Expenses</p>
+              <p className="text-2xl font-bold text-gray-900">{formatCurrency(data.monthlyRevenue * 0.66)}</p>
+              <p className="text-sm text-gray-500">Est. Total Expenses</p>
             </div>
             <div className="text-center">
-              <p className="text-2xl font-bold text-green-600">{formatCurrency(42200)}</p>
-              <p className="text-sm text-gray-500">Net Profit</p>
+              <p className="text-2xl font-bold text-green-600">{formatCurrency(data.monthlyRevenue * 0.34)}</p>
+              <p className="text-sm text-gray-500">Est. Net Profit</p>
             </div>
           </div>
           <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="bg-blue-50 rounded-lg p-4">
               <p className="text-sm font-medium text-blue-900">Partner A (60%)</p>
-              <p className="text-lg font-bold text-blue-900">{formatCurrency(2532)}</p>
+              <p className="text-lg font-bold text-blue-900">{formatCurrency((data.monthlyRevenue * 0.34) * 0.6)}</p>
             </div>
             <div className="bg-green-50 rounded-lg p-4">
               <p className="text-sm font-medium text-green-900">Partner B (40%)</p>
-              <p className="text-lg font-bold text-green-900">{formatCurrency(1688)}</p>
+              <p className="text-lg font-bold text-green-900">{formatCurrency((data.monthlyRevenue * 0.34) * 0.4)}</p>
             </div>
           </div>
         </div>

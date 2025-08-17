@@ -1,90 +1,123 @@
-'use client'
-
-import { useState } from 'react'
 import { Plus, DollarSign, TrendingUp, Calendar, Search, Filter, Eye, Download } from 'lucide-react'
 import { formatCurrency, formatDateTime } from '@/lib/utils'
+import { prisma } from '@/lib/prisma'
 
-// Mock sales data
-const mockSales = [
-  {
-    id: '1',
-    saleNumber: 'SAL001',
-    date: new Date('2024-01-15T12:30:00'),
-    customerName: 'John Doe',
-    items: [
-      { name: 'Chicken Biryani', quantity: 2, price: 250 },
-      { name: 'Soft Drink', quantity: 2, price: 25 }
-    ],
-    subtotal: 550,
-    tax: 55,
-    discount: 0,
-    total: 605,
-    paymentMethod: 'Cash',
-    status: 'Completed',
-    orderType: 'Dine In'
-  },
-  {
-    id: '2',
-    saleNumber: 'SAL002',
-    date: new Date('2024-01-15T14:15:00'),
-    customerName: 'Walk-in Customer',
-    items: [
-      { name: 'Beef Curry', quantity: 1, price: 180 },
-      { name: 'Rice', quantity: 1, price: 40 },
-      { name: 'Dal', quantity: 1, price: 60 }
-    ],
-    subtotal: 280,
-    tax: 28,
-    discount: 20,
-    total: 288,
-    paymentMethod: 'Card',
-    status: 'Completed',
-    orderType: 'Takeaway'
-  },
-  {
-    id: '3',
-    saleNumber: 'SAL003',
-    date: new Date('2024-01-15T18:45:00'),
-    customerName: 'Sarah Ahmed',
-    items: [
-      { name: 'Fish Curry', quantity: 1, price: 200 },
-      { name: 'Rice', quantity: 1, price: 40 }
-    ],
-    subtotal: 240,
-    tax: 24,
-    discount: 0,
-    total: 264,
-    paymentMethod: 'Digital Wallet',
-    status: 'Completed',
-    orderType: 'Delivery'
+// Get sales data from database
+async function getSalesData() {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const tomorrow = new Date(today)
+  tomorrow.setDate(tomorrow.getDate() + 1)
+
+  try {
+    const [sales, todayStats] = await Promise.all([
+      // Get recent sales with related data
+      prisma.sale.findMany({
+        include: {
+          user: {
+            select: {
+              name: true
+            }
+          },
+          order: {
+            select: {
+              orderNumber: true,
+              orderType: true,
+              customerId: true,
+              orderItems: {
+                include: {
+                  menuItem: {
+                    select: {
+                      name: true,
+                      price: true
+                    }
+                  },
+                  item: {
+                    select: {
+                      name: true,
+                      sellingPrice: true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        orderBy: {
+          saleDate: 'desc'
+        },
+        take: 50
+      }),
+
+      // Get today's statistics
+      prisma.sale.aggregate({
+        where: {
+          saleDate: {
+            gte: today,
+            lt: tomorrow
+          },
+          status: 'COMPLETED'
+        },
+        _count: {
+          id: true
+        },
+        _sum: {
+          finalAmount: true
+        }
+      })
+    ])
+
+    // Calculate additional stats
+    const todaySales = sales.filter(sale => 
+      sale.saleDate >= today && sale.saleDate < tomorrow && sale.status === 'COMPLETED'
+    )
+    
+    const paymentMethodStats = todaySales.reduce((acc, sale) => {
+      acc[sale.paymentMethod] = (acc[sale.paymentMethod] || 0) + sale.finalAmount
+      return acc
+    }, {} as Record<string, number>)
+
+    const totalSales = todayStats._sum.finalAmount || 0
+    const totalOrders = todayStats._count.id || 0
+    const averageOrder = totalOrders > 0 ? totalSales / totalOrders : 0
+
+    return {
+      sales,
+      dailyStats: {
+        totalSales,
+        totalOrders,
+        averageOrder,
+        cashSales: paymentMethodStats.CASH || 0,
+        cardSales: paymentMethodStats.CARD || 0,
+        digitalWalletSales: paymentMethodStats.DIGITAL_WALLET || 0,
+        bankTransferSales: paymentMethodStats.BANK_TRANSFER || 0
+      }
+    }
+  } catch (error) {
+    console.error('Sales data fetch error:', error)
+    return {
+      sales: [],
+      dailyStats: {
+        totalSales: 0,
+        totalOrders: 0,
+        averageOrder: 0,
+        cashSales: 0,
+        cardSales: 0,
+        digitalWalletSales: 0,
+        bankTransferSales: 0
+      }
+    }
   }
-]
-
-const dailyStats = {
-  totalSales: 1157,
-  totalOrders: 3,
-  averageOrder: 386,
-  cashSales: 605,
-  cardSales: 288,
-  digitalWalletSales: 264
 }
 
-export default function SalesPage() {
-  const [sales, setSales] = useState(mockSales)
-  const [searchTerm, setSearchTerm] = useState('')
-  const [selectedPeriod, setSelectedPeriod] = useState('Today')
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('All')
-  const [showAddModal, setShowAddModal] = useState(false)
+const paymentMethods = ['All', 'CASH', 'CARD', 'DIGITAL_WALLET', 'BANK_TRANSFER']
 
-  const periods = ['Today', 'Yesterday', 'This Week', 'This Month', 'Custom']
-  const paymentMethods = ['All', 'Cash', 'Card', 'Digital Wallet']
-  
-  const filteredSales = sales.filter(sale => {
-    const matchesSearch = sale.saleNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         sale.customerName.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesPayment = selectedPaymentMethod === 'All' || sale.paymentMethod === selectedPaymentMethod
-    return matchesSearch && matchesPayment
-  })
+export default async function SalesPage() {
+  const { sales, dailyStats } = await getSalesData()
+
+export default async function SalesPage() {
+  const { sales, dailyStats } = await getSalesData()
+  const totalDigital = dailyStats.cardSales + dailyStats.digitalWalletSales + dailyStats.bankTransferSales
 
   return (
     <div className="space-y-6">
@@ -96,10 +129,7 @@ export default function SalesPage() {
             Track daily sales and revenue performance
           </p>
         </div>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="inline-flex items-center rounded-md bg-green-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600"
-        >
+        <button className="inline-flex items-center rounded-md bg-green-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-600">
           <Plus className="h-4 w-4 mr-2" />
           Record Sale
         </button>
@@ -124,7 +154,7 @@ export default function SalesPage() {
           <div className="mt-2">
             <div className="flex items-center text-sm text-green-600">
               <TrendingUp className="mr-1 h-4 w-4" />
-              <span>+12.5% from yesterday</span>
+              <span>Live data</span>
             </div>
           </div>
         </div>
@@ -171,7 +201,7 @@ export default function SalesPage() {
                   Cash: {formatCurrency(dailyStats.cashSales)}
                 </dd>
                 <dd className="text-xs text-gray-500">
-                  Digital: {formatCurrency(dailyStats.cardSales + dailyStats.digitalWalletSales)}
+                  Digital: {formatCurrency(totalDigital)}
                 </dd>
               </dl>
             </div>
@@ -193,7 +223,7 @@ export default function SalesPage() {
                 <div className="w-full bg-gray-200 rounded-full h-2">
                   <div 
                     className="bg-green-600 h-2 rounded-full" 
-                    style={{ width: `${(dailyStats.cashSales / dailyStats.totalSales) * 100}%` }}
+                    style={{ width: dailyStats.totalSales > 0 ? `${(dailyStats.cashSales / dailyStats.totalSales) * 100}%` : '0%' }}
                   ></div>
                 </div>
 
@@ -204,7 +234,7 @@ export default function SalesPage() {
                 <div className="w-full bg-gray-200 rounded-full h-2">
                   <div 
                     className="bg-blue-600 h-2 rounded-full" 
-                    style={{ width: `${(dailyStats.cardSales / dailyStats.totalSales) * 100}%` }}
+                    style={{ width: dailyStats.totalSales > 0 ? `${(dailyStats.cardSales / dailyStats.totalSales) * 100}%` : '0%' }}
                   ></div>
                 </div>
 
@@ -215,9 +245,24 @@ export default function SalesPage() {
                 <div className="w-full bg-gray-200 rounded-full h-2">
                   <div 
                     className="bg-purple-600 h-2 rounded-full" 
-                    style={{ width: `${(dailyStats.digitalWalletSales / dailyStats.totalSales) * 100}%` }}
+                    style={{ width: dailyStats.totalSales > 0 ? `${(dailyStats.digitalWalletSales / dailyStats.totalSales) * 100}%` : '0%' }}
                   ></div>
                 </div>
+
+                {dailyStats.bankTransferSales > 0 && (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-gray-900">Bank Transfer</span>
+                      <span className="text-sm text-gray-500">{formatCurrency(dailyStats.bankTransferSales)}</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div 
+                        className="bg-indigo-600 h-2 rounded-full" 
+                        style={{ width: dailyStats.totalSales > 0 ? `${(dailyStats.bankTransferSales / dailyStats.totalSales) * 100}%` : '0%' }}
+                      ></div>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -238,21 +283,15 @@ export default function SalesPage() {
                   <input
                     type="text"
                     placeholder="Search sales..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
                     className="block w-full rounded-md border-0 py-1.5 pl-10 pr-3 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
                   />
                 </div>
                 <div className="flex items-center gap-2">
                   <Filter className="h-4 w-4 text-gray-400" />
-                  <select
-                    value={selectedPaymentMethod}
-                    onChange={(e) => setSelectedPaymentMethod(e.target.value)}
-                    className="rounded-md border-0 py-1.5 pl-3 pr-8 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
-                  >
+                  <select className="rounded-md border-0 py-1.5 pl-3 pr-8 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6">
                     {paymentMethods.map((method) => (
                       <option key={method} value={method}>
-                        {method}
+                        {method.replace('_', ' ')}
                       </option>
                     ))}
                   </select>
@@ -282,39 +321,43 @@ export default function SalesPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 bg-white">
-                    {filteredSales.map((sale) => (
+                    {sales.map((sale) => (
                       <tr key={sale.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm font-medium text-gray-900">{sale.saleNumber}</div>
                           <div className="text-sm text-gray-500">
-                            {formatDateTime(sale.date)} • {sale.orderType}
+                            {formatDateTime(sale.saleDate)} • {sale.order?.orderType.replace('_', ' ') || 'Direct Sale'}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">{sale.customerName}</div>
+                          <div className="text-sm text-gray-900">
+                            {sale.order?.customerId ? `Customer: ${sale.order.customerId}` : 'Walk-in'}
+                          </div>
                           <div className="text-sm text-gray-500">
-                            {sale.items.length} item(s)
+                            Staff: {sale.user.name}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm font-medium text-gray-900">
-                            {formatCurrency(sale.total)}
+                            {formatCurrency(sale.finalAmount)}
                           </div>
-                          {sale.discount > 0 && (
+                          {sale.discountAmount > 0 && (
                             <div className="text-sm text-red-600">
-                              -{formatCurrency(sale.discount)} discount
+                              -{formatCurrency(sale.discountAmount)} discount
                             </div>
                           )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                            sale.paymentMethod === 'Cash' 
+                            sale.paymentMethod === 'CASH' 
                               ? 'bg-green-100 text-green-800'
-                              : sale.paymentMethod === 'Card'
+                              : sale.paymentMethod === 'CARD'
                               ? 'bg-blue-100 text-blue-800'
-                              : 'bg-purple-100 text-purple-800'
+                              : sale.paymentMethod === 'DIGITAL_WALLET'
+                              ? 'bg-purple-100 text-purple-800'
+                              : 'bg-indigo-100 text-indigo-800'
                           }`}>
-                            {sale.paymentMethod}
+                            {sale.paymentMethod.replace('_', ' ')}
                           </span>
                           <div className="text-xs text-gray-500 mt-1">{sale.status}</div>
                         </td>
@@ -333,6 +376,14 @@ export default function SalesPage() {
                   </tbody>
                 </table>
               </div>
+
+              {sales.length === 0 && (
+                <div className="text-center py-8">
+                  <DollarSign className="mx-auto h-12 w-12 text-gray-400" />
+                  <h3 className="mt-2 text-sm font-semibold text-gray-900">No sales found</h3>
+                  <p className="mt-1 text-sm text-gray-500">Sales data will appear here once orders are completed.</p>
+                </div>
+              )}
             </div>
           </div>
         </div>

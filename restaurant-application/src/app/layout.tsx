@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Restaurant Management System",
-  description: "Comprehensive restaurant management system for tracking inventory, sales, employees, and partnership profits",
+  title: "Royal Food - Restaurant Management System",
+  description: "Royal Food management system for tracking inventory, sales, employees, and partnership profits",
 };
 
 export default function RootLayout({
