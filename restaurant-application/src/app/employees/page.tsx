@@ -199,27 +199,13 @@ export default async function EmployeesPage() {
         <table className="min-w-full divide-y divide-gray-300">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
-                Employee
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
-                Position
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
-                Contact
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
-                Salary (BDT)
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
-                Attendance
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
-                Status
-              </th>
-              <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wide text-gray-500">
-                Actions
-              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500">Employee</th>
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500">Position</th>
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500">Contact</th>
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500">Salary (BDT)</th>
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500">Attendance</th>
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500">Status</th>
+              <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wide text-gray-500">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200 bg-white">
