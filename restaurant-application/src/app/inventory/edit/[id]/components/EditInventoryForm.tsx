@@ -14,7 +14,6 @@ interface EditInventoryFormProps {
     description: string | null
     unit: string
     costPrice: number | null
-    sellingPrice: number | null
     minStockLevel: number | null
     currentStock: number
     isActive: boolean
@@ -41,7 +40,6 @@ export function EditInventoryForm({ item, categories, suppliers }: EditInventory
     description: item.description || '',
     unit: item.unit,
     costPrice: item.costPrice?.toString() || '',
-    sellingPrice: item.sellingPrice?.toString() || '',
     minStockLevel: item.minStockLevel?.toString() || '',
     currentStock: item.currentStock.toString(),
     categoryId: item.categoryId,
@@ -69,7 +67,6 @@ export function EditInventoryForm({ item, categories, suppliers }: EditInventory
         description: formData.description || null,
         unit: formData.unit,
         costPrice: formData.costPrice ? parseFloat(formData.costPrice) : null,
-        sellingPrice: formData.sellingPrice ? parseFloat(formData.sellingPrice) : null,
         minStockLevel: formData.minStockLevel ? parseInt(formData.minStockLevel) : null,
         currentStock: parseInt(formData.currentStock),
         categoryId: formData.categoryId,
@@ -301,10 +298,10 @@ export function EditInventoryForm({ item, categories, suppliers }: EditInventory
         </div>
 
         {/* Pricing */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-1 gap-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Cost Price (₹)
+              Cost Price (BDT) <span className="text-red-500">*</span>
             </label>
             <input
               type="number"
@@ -313,25 +310,11 @@ export function EditInventoryForm({ item, categories, suppliers }: EditInventory
               onChange={handleInputChange}
               min="0"
               step="0.01"
+              required
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder="0.00"
             />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Selling Price (₹)
-            </label>
-            <input
-              type="number"
-              name="sellingPrice"
-              value={formData.sellingPrice}
-              onChange={handleInputChange}
-              min="0"
-              step="0.01"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="0.00"
-            />
+            <p className="text-xs text-gray-500 mt-1">Cost per unit of this ingredient/stock item</p>
           </div>
         </div>
 

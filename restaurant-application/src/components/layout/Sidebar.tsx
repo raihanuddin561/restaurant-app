@@ -9,18 +9,20 @@ import {
   Settings,
   FileText,
   Clock,
-  ChefHat
+  ChefHat,
+  Calculator
 } from 'lucide-react'
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: Home },
+  { name: 'Financial Management', href: '/financial-management', icon: Calculator },
   { name: 'Inventory', href: '/inventory', icon: Package },
   { name: 'Orders', href: '/orders', icon: ShoppingCart },
   { name: 'Menu', href: '/menu', icon: ChefHat },
   { name: 'Employees', href: '/employees', icon: Users },
   { name: 'Sales', href: '/sales', icon: DollarSign },
-  { name: 'Reports', href: '/reports', icon: FileText },
   { name: 'Expenses', href: '/expenses', icon: TrendingUp },
+  { name: 'Reports', href: '/reports', icon: FileText },
   { name: 'Partnership', href: '/partnership', icon: Users },
   { name: 'Attendance', href: '/attendance', icon: Clock },
   { name: 'Settings', href: '/settings', icon: Settings },

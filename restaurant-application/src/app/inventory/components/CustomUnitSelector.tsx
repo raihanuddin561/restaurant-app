@@ -106,7 +106,7 @@ export function CustomUnitSelector({ value, onChange, required, className = '' }
             + Add Custom Unit
           </option>
           {isCustomUnit && (
-            <option value="custom" selected className="text-green-600 font-medium">
+            <option value="custom" className="text-green-600 font-medium">
               {value} (Custom Unit)
             </option>
           )}

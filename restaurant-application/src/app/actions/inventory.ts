@@ -86,7 +86,7 @@ export async function createInventoryItem(formData: FormData) {
         supplierId,
         unit,
         costPrice,
-        sellingPrice: costPrice * 1.3, // Default 30% markup
+        // No selling price for ingredients/stock items
         currentStock: initialStock,
         reorderLevel,
         description,
@@ -194,7 +194,7 @@ export async function createBulkInventoryItems(formData: FormData) {
         categoryId: itemData.categoryId,
         unit: itemData.unit,
         costPrice,
-        sellingPrice: costPrice * 1.3,
+        // No selling price for ingredients/stock items
         currentStock: initialStock,
         reorderLevel,
         isActive: true
@@ -351,7 +351,7 @@ export async function createMultipleInventoryItems(itemsData: Array<{
           supplierId: itemData.supplierId || null,
           unit: itemData.unit.trim(),
           costPrice: itemData.costPrice,
-          sellingPrice: itemData.costPrice * 1.3, // Default 30% markup
+          // No selling price for ingredients/stock items
           currentStock: itemData.currentStock,
           reorderLevel: itemData.reorderLevel,
           description: itemData.description || null,
@@ -404,7 +404,6 @@ export async function updateInventoryItem(itemId: string, updateData: {
   description: string | null
   unit: string
   costPrice: number | null
-  sellingPrice: number | null
   minStockLevel: number | null
   currentStock: number
   categoryId: string
@@ -480,7 +479,7 @@ export async function updateInventoryItem(itemId: string, updateData: {
         description: updateData.description,
         unit: updateData.unit,
         costPrice: updateData.costPrice || 0,
-        sellingPrice: updateData.sellingPrice,
+        // No selling price for ingredients/stock items
         reorderLevel: updateData.minStockLevel || 0,
         currentStock: updateData.currentStock,
         categoryId: updateData.categoryId,
@@ -538,7 +537,6 @@ export async function updateInventoryItemForm(formData: FormData) {
     const supplierId = formData.get('supplierId') as string || null
     const unit = formData.get('unit') as string
     const costPrice = parseFloat(formData.get('costPrice') as string)
-    const sellingPrice = parseFloat(formData.get('sellingPrice') as string) || null
     const reorderLevel = parseFloat(formData.get('reorderLevel') as string)
     const description = formData.get('description') as string || null
     const brand = formData.get('brand') as string || null
@@ -608,7 +606,7 @@ export async function updateInventoryItemForm(formData: FormData) {
         supplierId,
         unit,
         costPrice,
-        sellingPrice: sellingPrice || costPrice * 1.3,
+        // No selling price for ingredients/stock items
         reorderLevel,
         description,
         brand,

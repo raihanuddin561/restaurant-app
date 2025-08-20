@@ -5,11 +5,11 @@ import { Settings, Globe, DollarSign, Clock, Save, User, Bell } from 'lucide-rea
 
 const languages = [
   { code: 'en', name: 'English', flag: '🇺🇸' },
-  { code: 'bn', name: 'বাংলা (Bengali)', flag: '🇧🇩' }
+  { code: 'bn', name: 'Bengali', flag: '🇧🇩' }
 ]
 
 const currencies = [
-  { code: 'BDT', name: 'Bangladesh Taka (৳)', symbol: '৳' },
+  { code: 'BDT', name: 'Bangladesh Taka (BDT)', symbol: 'BDT' },
   { code: 'USD', name: 'US Dollar ($)', symbol: '$' }
 ]
 
