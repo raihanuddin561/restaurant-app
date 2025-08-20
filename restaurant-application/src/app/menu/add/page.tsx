@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ArrowLeft, Upload, Plus, X } from 'lucide-react'
 import Link from 'next/link'
 import { formatCurrency } from '@/lib/utils'
@@ -13,26 +13,23 @@ interface Ingredient {
   cost: number
 }
 
-const mockIngredients = [
-  { id: '1', name: 'Basmati Rice', unit: 'kg', costPerUnit: 120 },
-  { id: '2', name: 'Chicken Breast', unit: 'kg', costPerUnit: 280 },
-  { id: '3', name: 'Fresh Tomatoes', unit: 'kg', costPerUnit: 60 },
-  { id: '4', name: 'Cooking Oil', unit: 'L', costPerUnit: 180 },
-  { id: '5', name: 'Onions', unit: 'kg', costPerUnit: 40 },
-  { id: '6', name: 'Spices Mix', unit: 'packet', costPerUnit: 25 }
-]
+interface InventoryItem {
+  id: string
+  name: string
+  unit: string
+  costPrice: number
+  currentStock: number
+}
 
-const categories = [
-  'Appetizers',
-  'Main Course', 
-  'Beverages',
-  'Desserts'
-]
+interface Category {
+  id: string
+  name: string
+}
 
 export default function AddMenuItemPage() {
   const [formData, setFormData] = useState({
     name: '',
-    category: '',
+    categoryId: '',
     description: '',
     price: '',
     prepTime: '',
@@ -41,6 +38,45 @@ export default function AddMenuItemPage() {
 
   const [selectedIngredients, setSelectedIngredients] = useState<Ingredient[]>([])
   const [showIngredientSelector, setShowIngredientSelector] = useState(false)
+  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
+  const [loading, setLoading] = useState(false)
+
+  // Fetch categories and inventory items
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        console.log('🔍 Starting to fetch categories and inventory items...')
+        const [categoriesResponse, inventoryResponse] = await Promise.all([
+          fetch('/api/categories'),
+          fetch('/api/inventory/items')
+        ])
+
+        console.log('📊 Categories response status:', categoriesResponse.status)
+        console.log('📦 Inventory response status:', inventoryResponse.status)
+
+        if (categoriesResponse.ok) {
+          const categoriesData = await categoriesResponse.json()
+          console.log('✅ Categories loaded:', categoriesData)
+          setCategories(categoriesData)
+        } else {
+          console.error('❌ Categories failed:', await categoriesResponse.text())
+        }
+
+        if (inventoryResponse.ok) {
+          const inventoryData = await inventoryResponse.json()
+          console.log('✅ Inventory items loaded:', inventoryData)
+          setInventoryItems(inventoryData)
+        } else {
+          console.error('❌ Inventory failed:', await inventoryResponse.text())
+        }
+      } catch (error) {
+        console.error('💥 Error fetching data:', error)
+      }
+    }
+
+    fetchData()
+  }, [])
 
   const calculateCostPrice = () => {
     return selectedIngredients.reduce((total, ingredient) => {
@@ -55,13 +91,13 @@ export default function AddMenuItemPage() {
     return Math.round(((price - costPrice) / price) * 100)
   }
 
-  const addIngredient = (ingredientData: any) => {
+  const addIngredient = (inventoryItem: InventoryItem) => {
     const newIngredient: Ingredient = {
-      id: ingredientData.id,
-      name: ingredientData.name,
+      id: inventoryItem.id,
+      name: inventoryItem.name,
       quantity: 1,
-      unit: ingredientData.unit,
-      cost: ingredientData.costPerUnit
+      unit: inventoryItem.unit,
+      cost: inventoryItem.costPrice
     }
     setSelectedIngredients([...selectedIngredients, newIngredient])
     setShowIngredientSelector(false)
@@ -79,12 +115,36 @@ export default function AddMenuItemPage() {
     setSelectedIngredients(prev => prev.filter(ing => ing.id !== id))
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // TODO: Implement actual form submission to API
-    console.log('Form Data:', formData)
-    console.log('Ingredients:', selectedIngredients)
-    console.log('Cost Price:', calculateCostPrice())
+    setLoading(true)
+
+    try {
+      const response = await fetch('/api/menu-items', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          ...formData,
+          price: parseFloat(formData.price),
+          prepTime: parseInt(formData.prepTime),
+          ingredients: selectedIngredients
+        })
+      })
+
+      if (response.ok) {
+        window.location.href = '/menu'
+      } else {
+        console.error('Failed to create menu item')
+        alert('Failed to create menu item. Please try again.')
+      }
+    } catch (error) {
+      console.error('Error creating menu item:', error)
+      alert('Error creating menu item. Please try again.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -130,21 +190,21 @@ export default function AddMenuItemPage() {
               </div>
 
               <div className="sm:col-span-2">
-                <label htmlFor="category" className="block text-sm font-medium text-gray-700">
+                <label htmlFor="categoryId" className="block text-sm font-medium text-gray-700">
                   Category *
                 </label>
                 <div className="mt-1">
                   <select
-                    id="category"
-                    name="category"
+                    id="categoryId"
+                    name="categoryId"
                     required
-                    value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                    value={formData.categoryId}
+                    onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
                     className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"
                   >
                     <option value="">Select category</option>
                     {categories.map(category => (
-                      <option key={category} value={category}>{category}</option>
+                      <option key={category.id} value={category.id}>{category.name}</option>
                     ))}
                   </select>
                 </div>
@@ -358,9 +418,10 @@ export default function AddMenuItemPage() {
             </Link>
             <button
               type="submit"
-              className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              disabled={loading}
+              className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Create Menu Item
+              {loading ? 'Creating...' : 'Create Menu Item'}
             </button>
           </div>
         </div>
@@ -379,23 +440,38 @@ export default function AddMenuItemPage() {
                 <X className="h-5 w-5" />
               </button>
             </div>
+            
+            <div className="mb-2 text-xs text-gray-500">
+              Debug: Found {inventoryItems.length} inventory items
+            </div>
+            
             <div className="space-y-2 max-h-60 overflow-y-auto">
-              {mockIngredients
-                .filter(ing => !selectedIngredients.find(selected => selected.id === ing.id))
-                .map(ingredient => (
-                  <button
-                    key={ingredient.id}
-                    onClick={() => addIngredient(ingredient)}
-                    className="w-full text-left p-3 hover:bg-gray-50 rounded-md border"
-                  >
-                    <div className="flex justify-between">
-                      <span className="font-medium">{ingredient.name}</span>
-                      <span className="text-sm text-gray-500">
-                        {formatCurrency(ingredient.costPerUnit)}/{ingredient.unit}
-                      </span>
-                    </div>
-                  </button>
-                ))}
+              {inventoryItems.length === 0 ? (
+                <div className="text-center p-4 text-gray-500">
+                  <p>No inventory items found.</p>
+                  <p className="text-xs mt-2">Make sure you have added items to your inventory.</p>
+                </div>
+              ) : (
+                inventoryItems
+                  .filter(item => !selectedIngredients.find(selected => selected.id === item.id))
+                  .map(item => (
+                    <button
+                      key={item.id}
+                      onClick={() => addIngredient(item)}
+                      className="w-full text-left p-3 hover:bg-gray-50 rounded-md border"
+                    >
+                      <div className="flex justify-between">
+                        <span className="font-medium">{item.name}</span>
+                        <span className="text-sm text-gray-500">
+                          {formatCurrency(item.costPrice)}/{item.unit}
+                        </span>
+                      </div>
+                      <div className="text-xs text-gray-400 mt-1">
+                        Stock: {item.currentStock} {item.unit}
+                      </div>
+                    </button>
+                  ))
+              )}
             </div>
           </div>
         </div>

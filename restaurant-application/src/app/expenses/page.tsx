@@ -10,7 +10,9 @@ import {
   getExpenseAnalytics,
   initializeExpenseCategories
 } from '@/app/actions/expenses'
-import ExpenseForm from './components/ExpenseForm'
+import ExpenseForm from './components/ExpenseFormFixed'
+import SimpleExpenseForm from './components/SimpleExpenseForm'
+import ExpenseActions from './components/ExpenseActions'
 
 interface Expense {
   id: string
@@ -420,15 +422,11 @@ export default function ExpenseManagementPage() {
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex items-center justify-end space-x-2">
-                        {expense.receiptImage && (
-                          <button className="text-blue-600 hover:text-blue-900">
-                            <Receipt className="h-4 w-4" />
-                          </button>
-                        )}
-                        <button className="text-indigo-600 hover:text-indigo-900">Edit</button>
-                        <button className="text-red-600 hover:text-red-900">Delete</button>
-                      </div>
+                      <ExpenseActions 
+                        expense={expense} 
+                        categories={categories}
+                        onUpdate={loadData}
+                      />
                     </td>
                   </tr>
                 )

@@ -1,10 +1,12 @@
 ﻿'use client'
 
+import { useState } from 'react'
 import { Save } from 'lucide-react'
 import { useFormStatus } from 'react-dom'
+import { useRouter } from 'next/navigation'
 import { createInventoryItem } from '@/app/actions/inventory'
 import { CustomUnitSelector } from '../../components/CustomUnitSelector'
-import { useState } from 'react'
+import { useNotification, Notification } from '@/components/ui/Notification'
 
 interface Category {
   id: string
@@ -36,15 +38,7 @@ function SubmitButton() {
   )
 }
 
-'use client'
-
-import { useState } from 'react'
-import { createInventoryItem } from '@/app/actions/inventory'
-import { CustomUnitSelector } from '@/app/inventory/add/components/CustomUnitSelector'
-import { useNotification, Notification } from '@/components/ui/Notification'
-import { useRouter } from 'next/navigation'
-
-export default function InventoryForm() {
+export default function InventoryForm({ categories, suppliers }: InventoryFormProps) {
   const [selectedUnit, setSelectedUnit] = useState('')
   const { showNotification, notification, clearNotification } = useNotification()
   const router = useRouter()

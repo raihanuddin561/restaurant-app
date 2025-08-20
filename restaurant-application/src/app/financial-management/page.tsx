@@ -5,6 +5,16 @@ import { Calendar, DollarSign, TrendingUp, TrendingDown, Package, Users, Shoppin
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { getComprehensiveFinancialData, recordStockInput, recordEmployeeExpense, type ComprehensiveFinancialData } from '@/app/actions/financial-analysis'
 
+// Safe currency formatting function
+const safeCurrencyFormat = (amount: number | null | undefined): string => {
+  try {
+    return formatCurrency(amount || 0)
+  } catch (error) {
+    console.warn('Currency formatting error:', error)
+    return `৳${(amount || 0).toFixed(2)}`
+  }
+}
+
 export default function FinancialManagementPage() {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
   const [selectedPeriod, setSelectedPeriod] = useState<'today' | 'week' | 'month'>('today')
@@ -24,11 +34,40 @@ export default function FinancialManagementPage() {
         period: selectedPeriod
       })
       
-      if (result.success && result.data) {
+      if (result.success) {
         setFinancialData(result.data)
+      } else {
+        console.warn('Financial data loading warning:', result.error)
+        // Set default data if failed but don't crash the app
+        if (result.data) {
+          setFinancialData(result.data)
+        }
       }
     } catch (error) {
       console.error('Error loading financial data:', error)
+      // Set safe default data to prevent crash
+      setFinancialData({
+        date: selectedDate,
+        dailySales: 0,
+        totalOrders: 0,
+        averageOrderValue: 0,
+        stockExpenses: 0,
+        employeeExpenses: 0,
+        operationalExpenses: 0,
+        totalExpenses: 0,
+        currentStockValue: 0,
+        stockMovement: 0,
+        stockTurnover: 0,
+        grossProfit: 0,
+        netProfit: 0,
+        profitMargin: 0,
+        totalAssets: 0,
+        totalLiabilities: 0,
+        equity: 0,
+        cashInflow: 0,
+        cashOutflow: 0,
+        netCashFlow: 0
+      })
     } finally {
       setLoading(false)
     }
@@ -155,15 +194,15 @@ export default function FinancialManagementPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Total Sales</p>
-                <p className="text-2xl font-bold text-green-600">{formatCurrency(financialData.dailySales)}</p>
-                <p className="text-xs text-gray-500 mt-1">{financialData.totalOrders} orders</p>
+                <p className="text-2xl font-bold text-green-600">{safeCurrencyFormat(financialData.dailySales)}</p>
+                <p className="text-xs text-gray-500 mt-1">{financialData.totalOrders || 0} orders</p>
               </div>
               <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
                 <DollarSign className="w-6 h-6 text-green-600" />
               </div>
             </div>
             <div className="mt-4 text-xs text-gray-500">
-              Avg: {formatCurrency(financialData.averageOrderValue)} per order
+              Avg: {safeCurrencyFormat(financialData.averageOrderValue)} per order
             </div>
           </div>
 
@@ -172,7 +211,7 @@ export default function FinancialManagementPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Total Expenses</p>
-                <p className="text-2xl font-bold text-red-600">{formatCurrency(financialData.totalExpenses)}</p>
+                <p className="text-2xl font-bold text-red-600">{safeCurrencyFormat(financialData.totalExpenses)}</p>
                 <p className="text-xs text-gray-500 mt-1">All categories</p>
               </div>
               <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
@@ -181,11 +220,11 @@ export default function FinancialManagementPage() {
             </div>
             <div className="mt-2 space-y-1">
               <div className="flex justify-between text-xs">
-                <span className="text-orange-600">Stock: {formatCurrency(financialData.stockExpenses)}</span>
-                <span className="text-purple-600">Employee: {formatCurrency(financialData.employeeExpenses)}</span>
+                <span className="text-orange-600">Stock: {safeCurrencyFormat(financialData.stockExpenses)}</span>
+                <span className="text-purple-600">Employee: {safeCurrencyFormat(financialData.employeeExpenses)}</span>
               </div>
               <div className="text-xs text-blue-600">
-                Operational: {formatCurrency(financialData.operationalExpenses)}
+                Operational: {safeCurrencyFormat(financialData.operationalExpenses)}
               </div>
             </div>
           </div>
@@ -195,17 +234,17 @@ export default function FinancialManagementPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Net Profit</p>
-                <p className={`text-2xl font-bold ${financialData.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {formatCurrency(financialData.netProfit)}
+                <p className={`text-2xl font-bold ${(financialData.netProfit || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {safeCurrencyFormat(financialData.netProfit)}
                 </p>
-                <p className="text-xs text-gray-500 mt-1">{financialData.profitMargin.toFixed(1)}% margin</p>
+                <p className="text-xs text-gray-500 mt-1">{(financialData.profitMargin || 0).toFixed(1)}% margin</p>
               </div>
-              <div className={`w-12 h-12 ${financialData.netProfit >= 0 ? 'bg-green-100' : 'bg-red-100'} rounded-lg flex items-center justify-center`}>
-                <TrendingUp className={`w-6 h-6 ${financialData.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`} />
+              <div className={`w-12 h-12 ${(financialData.netProfit || 0) >= 0 ? 'bg-green-100' : 'bg-red-100'} rounded-lg flex items-center justify-center`}>
+                <TrendingUp className={`w-6 h-6 ${(financialData.netProfit || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`} />
               </div>
             </div>
             <div className="mt-2 text-xs text-gray-500">
-              Gross: {formatCurrency(financialData.grossProfit)}
+              Gross: {safeCurrencyFormat(financialData.grossProfit)}
             </div>
           </div>
 
@@ -214,7 +253,7 @@ export default function FinancialManagementPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Stock Value</p>
-                <p className="text-2xl font-bold text-blue-600">{formatCurrency(financialData.currentStockValue)}</p>
+                <p className="text-2xl font-bold text-blue-600">{safeCurrencyFormat(financialData.currentStockValue)}</p>
                 <p className="text-xs text-gray-500 mt-1">Current inventory</p>
               </div>
               <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -222,7 +261,7 @@ export default function FinancialManagementPage() {
               </div>
             </div>
             <div className="mt-2 text-xs text-gray-500">
-              Turnover: {financialData.stockTurnover.toFixed(1)}x
+              Turnover: {(financialData.stockTurnover || 0).toFixed(1)}x
             </div>
           </div>
         </div>
@@ -242,42 +281,42 @@ export default function FinancialManagementPage() {
             <div className="p-6 space-y-4">
               <div className="flex justify-between items-center">
                 <span className="font-medium text-gray-700">Revenue</span>
-                <span className="font-semibold text-green-600">{formatCurrency(financialData.dailySales)}</span>
+                <span className="font-semibold text-green-600">{safeCurrencyFormat(financialData.dailySales)}</span>
               </div>
               <div className="pl-4 space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Orders: {financialData.totalOrders}</span>
-                  <span className="text-gray-500">Avg: {formatCurrency(financialData.averageOrderValue)}</span>
+                  <span className="text-gray-500">Avg: {safeCurrencyFormat(financialData.averageOrderValue)}</span>
                 </div>
               </div>
               
               <div className="border-t pt-3">
                 <div className="flex justify-between items-center text-red-600">
                   <span className="font-medium">Cost of Goods Sold</span>
-                  <span className="font-semibold">-{formatCurrency(financialData.stockExpenses)}</span>
+                  <span className="font-semibold">-{safeCurrencyFormat(financialData.stockExpenses)}</span>
                 </div>
               </div>
               
               <div className="flex justify-between items-center border-t pt-3">
                 <span className="font-medium text-gray-700">Gross Profit</span>
-                <span className="font-semibold text-blue-600">{formatCurrency(financialData.grossProfit)}</span>
+                <span className="font-semibold text-blue-600">{safeCurrencyFormat(financialData.grossProfit)}</span>
               </div>
               
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Employee Expenses</span>
-                  <span className="text-red-500">-{formatCurrency(financialData.employeeExpenses)}</span>
+                  <span className="text-red-500">-{safeCurrencyFormat(financialData.employeeExpenses)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Operational Expenses</span>
-                  <span className="text-red-500">-{formatCurrency(financialData.operationalExpenses)}</span>
+                  <span className="text-red-500">-{safeCurrencyFormat(financialData.operationalExpenses)}</span>
                 </div>
               </div>
               
               <div className="flex justify-between items-center border-t pt-3 text-lg">
                 <span className="font-bold text-gray-900">Net Profit</span>
                 <span className={`font-bold ${financialData.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {formatCurrency(financialData.netProfit)}
+                  {safeCurrencyFormat(financialData.netProfit)}
                 </span>
               </div>
             </div>
@@ -297,15 +336,15 @@ export default function FinancialManagementPage() {
                 <div className="pl-4 space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Inventory</span>
-                    <span>{formatCurrency(financialData.currentStockValue)}</span>
+                    <span>{safeCurrencyFormat(financialData.currentStockValue)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Cash (Estimated)</span>
-                    <span>{formatCurrency(Math.max(0, financialData.netCashFlow))}</span>
+                    <span>{safeCurrencyFormat(Math.max(0, financialData.netCashFlow))}</span>
                   </div>
                   <div className="flex justify-between font-semibold border-t pt-2">
                     <span>Total Assets</span>
-                    <span>{formatCurrency(financialData.totalAssets)}</span>
+                    <span>{safeCurrencyFormat(financialData.totalAssets)}</span>
                   </div>
                 </div>
               </div>
@@ -315,11 +354,11 @@ export default function FinancialManagementPage() {
                 <div className="pl-4 space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Accounts Payable</span>
-                    <span>{formatCurrency(financialData.totalLiabilities)}</span>
+                    <span>{safeCurrencyFormat(financialData.totalLiabilities)}</span>
                   </div>
                   <div className="flex justify-between font-semibold border-t pt-2">
                     <span>Total Liabilities</span>
-                    <span>{formatCurrency(financialData.totalLiabilities)}</span>
+                    <span>{safeCurrencyFormat(financialData.totalLiabilities)}</span>
                   </div>
                 </div>
               </div>
@@ -327,7 +366,7 @@ export default function FinancialManagementPage() {
               <div className="border-t pt-3">
                 <div className="flex justify-between font-bold text-lg">
                   <span>Equity</span>
-                  <span className="text-green-600">{formatCurrency(financialData.equity)}</span>
+                  <span className="text-green-600">{safeCurrencyFormat(financialData.equity)}</span>
                 </div>
               </div>
             </div>
@@ -347,7 +386,7 @@ export default function FinancialManagementPage() {
                 <div className="pl-4 space-y-2">
                   <div className="flex justify-between">
                     <span className="text-gray-600">Sales Revenue</span>
-                    <span className="text-green-600">{formatCurrency(financialData.cashInflow)}</span>
+                    <span className="text-green-600">{safeCurrencyFormat(financialData.cashInflow)}</span>
                   </div>
                 </div>
               </div>
@@ -357,19 +396,19 @@ export default function FinancialManagementPage() {
                 <div className="pl-4 space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Stock Purchases</span>
-                    <span className="text-red-500">{formatCurrency(financialData.stockExpenses)}</span>
+                    <span className="text-red-500">{safeCurrencyFormat(financialData.stockExpenses)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Employee Costs</span>
-                    <span className="text-red-500">{formatCurrency(financialData.employeeExpenses)}</span>
+                    <span className="text-red-500">{safeCurrencyFormat(financialData.employeeExpenses)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Operations</span>
-                    <span className="text-red-500">{formatCurrency(financialData.operationalExpenses)}</span>
+                    <span className="text-red-500">{safeCurrencyFormat(financialData.operationalExpenses)}</span>
                   </div>
                   <div className="flex justify-between font-semibold border-t pt-2">
                     <span>Total Outflows</span>
-                    <span className="text-red-500">{formatCurrency(financialData.cashOutflow)}</span>
+                    <span className="text-red-500">{safeCurrencyFormat(financialData.cashOutflow)}</span>
                   </div>
                 </div>
               </div>
@@ -378,7 +417,7 @@ export default function FinancialManagementPage() {
                 <div className="flex justify-between font-bold text-lg">
                   <span>Net Cash Flow</span>
                   <span className={financialData.netCashFlow >= 0 ? 'text-green-600' : 'text-red-600'}>
-                    {formatCurrency(financialData.netCashFlow)}
+                    {safeCurrencyFormat(financialData.netCashFlow)}
                   </span>
                 </div>
               </div>

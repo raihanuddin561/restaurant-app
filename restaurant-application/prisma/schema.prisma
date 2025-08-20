@@ -29,6 +29,7 @@ model User {
   createdOrders   Order[]
   createdSales    Sale[]
   inventoryLogs   InventoryLog[]
+  stockUsage      StockUsage[]  // Track who recorded stock usage
 
   @@map("users")
 }
@@ -198,8 +199,9 @@ model Item {
   supplier      Supplier?      @relation(fields: [supplierId], references: [id])
   inventoryLogs InventoryLog[]
   purchaseItems PurchaseItem[]
-  menuItems     MenuItem[]
+  recipeItems   RecipeItem[]   // Used in recipes
   orderItems    OrderItem[]
+  stockUsage    StockUsage[]   // Track actual usage in production
 
   @@map("items")
 }
@@ -224,10 +226,57 @@ model InventoryLog {
 }
 
 enum InventoryLogType {
-  STOCK_IN
-  STOCK_OUT
-  ADJUSTMENT
-  WASTE
+  STOCK_IN      // Purchase/receiving stock
+  STOCK_OUT     // Used in production
+  ADJUSTMENT    // Manual corrections
+  WASTE         // Spoiled/expired items
+  TRANSFER      // Between locations
+}
+
+// Stock Usage Tracking - When ingredients are used in production
+model StockUsage {
+  id           String   @id @default(cuid())
+  itemId       String   // Which ingredient was used
+  menuItemId   String?  // Which menu item it was used for
+  orderId      String?  // Specific order (if applicable)
+  quantity     Float    // How much was used
+  unit         String   // kg, pieces, etc.
+  costPerUnit  Float    // Cost at time of usage (FIFO)
+  totalCost    Float    // quantity × costPerUnit
+  usageDate    DateTime @default(now())
+  reason       String   @default("PRODUCTION") // PRODUCTION, SAMPLE, WASTE
+  userId       String   // Who recorded the usage
+  createdAt    DateTime @default(now())
+
+  // Relations
+  item     Item      @relation(fields: [itemId], references: [id])
+  menuItem MenuItem? @relation(fields: [menuItemId], references: [id])
+  order    Order?    @relation(fields: [orderId], references: [id])
+  user     User      @relation(fields: [userId], references: [id])
+
+  @@map("stock_usage")
+}
+
+// Menu Item Sales Tracking with Cost Analysis
+model MenuItemSale {
+  id           String   @id @default(cuid())
+  menuItemId   String
+  saleId       String   // Link to main sale record
+  quantity     Int      // How many portions sold
+  unitPrice    Float    // Price per portion
+  totalPrice   Float    // quantity × unitPrice
+  unitCost     Float    // Recipe cost per portion at time of sale
+  totalCost    Float    // quantity × unitCost
+  grossProfit  Float    // totalPrice - totalCost
+  profitMargin Float    // (grossProfit ÷ totalPrice) × 100
+  saleDate     DateTime
+  createdAt    DateTime @default(now())
+
+  // Relations
+  menuItem MenuItem @relation(fields: [menuItemId], references: [id])
+  sale     Sale     @relation(fields: [saleId], references: [id])
+
+  @@map("menu_item_sales")
 }
 
 // Purchase Management
@@ -272,27 +321,49 @@ enum PurchaseStatus {
   CANCELLED
 }
 
-// Menu Management
+// Menu Management with Recipe System
 model MenuItem {
   id           String   @id @default(cuid())
   name         String
   categoryId   String
   description  String?
   price        Float
-  costPrice    Float    // Calculated from ingredients
+  costPrice    Float    @default(0) // Auto-calculated from recipe ingredients
   isAvailable  Boolean  @default(true)
   isActive     Boolean  @default(true)
   image        String?
   prepTime     Int?     // in minutes
+  servingSize  Int      @default(1) // number of portions this recipe makes
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   // Relations
-  category    Category    @relation(fields: [categoryId], references: [id])
-  ingredients Item[]      // Many-to-many for recipe ingredients
-  orderItems  OrderItem[]
+  category      Category      @relation(fields: [categoryId], references: [id])
+  recipeItems   RecipeItem[]  // Recipe ingredients with quantities
+  orderItems    OrderItem[]
+  menuItemSales MenuItemSale[]
+  stockUsage    StockUsage[]  // Track ingredient usage for this menu item
 
   @@map("menu_items")
+}
+
+// Recipe Management - Links menu items to ingredients with quantities
+model RecipeItem {
+  id          String   @id @default(cuid())
+  menuItemId  String
+  itemId      String   // The stock ingredient
+  quantity    Float    // Amount needed for the recipe
+  unit        String   // kg, pieces, liters, etc.
+  cost        Float    @default(0) // Auto-calculated: quantity × current item cost
+  notes       String?  // e.g., "finely chopped", "marinated overnight"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  menuItem MenuItem @relation(fields: [menuItemId], references: [id])
+  item     Item     @relation(fields: [itemId], references: [id])
+
+  @@map("recipe_items")
 }
 
 // Order Management (Customer Orders)
@@ -313,9 +384,10 @@ model Order {
   updatedAt    DateTime    @updatedAt
 
   // Relations
-  user       User        @relation(fields: [userId], references: [id])
+  user       User         @relation(fields: [userId], references: [id])
   orderItems OrderItem[]
   sale       Sale?
+  stockUsage StockUsage[] // Track ingredient usage for this order
 
   @@map("orders")
 }
@@ -373,8 +445,9 @@ model Sale {
   updatedAt     DateTime    @updatedAt
 
   // Relations
-  order Order? @relation(fields: [orderId], references: [id])
-  user  User   @relation(fields: [userId], references: [id])
+  order         Order?          @relation(fields: [orderId], references: [id])
+  user          User            @relation(fields: [userId], references: [id])
+  menuItemSales MenuItemSale[]  // Detailed sales by menu item with cost analysis
 
   @@map("sales")
 }

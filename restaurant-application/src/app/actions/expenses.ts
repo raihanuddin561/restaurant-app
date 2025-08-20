@@ -233,6 +233,115 @@ export async function getExpenseCategories() {
   }
 }
 
+// Daily Salary Expense Recording (Best Practice for Restaurant Management)
+export async function recordDailySalaryExpenses(date: Date) {
+  try {
+    const startOfDay = new Date(date)
+    startOfDay.setHours(0, 0, 0, 0)
+    
+    const endOfDay = new Date(date)
+    endOfDay.setHours(23, 59, 59, 999)
+
+    // Check if salary expenses already recorded for this date
+    const existingSalaryExpenses = await prisma.expense.findFirst({
+      where: {
+        expenseDate: {
+          gte: startOfDay,
+          lte: endOfDay
+        },
+        expenseCategory: {
+          type: 'PAYROLL'
+        },
+        description: {
+          contains: 'Daily salary allocation'
+        }
+      }
+    })
+
+    if (existingSalaryExpenses) {
+      return { 
+        success: true, 
+        message: 'Daily salary expenses already recorded',
+        alreadyRecorded: true
+      }
+    }
+
+    // Get all active employees
+    const activeEmployees = await prisma.employee.findMany({
+      where: {
+        isActive: true
+      },
+      include: {
+        user: true
+      }
+    })
+
+    if (activeEmployees.length === 0) {
+      return { 
+        success: true, 
+        message: 'No active employees found - no salary expenses to record',
+        employeeCount: 0
+      }
+    }
+
+    // Find or create payroll expense category
+    let payrollCategory = await prisma.expenseCategory.findFirst({
+      where: {
+        type: 'PAYROLL'
+      }
+    })
+
+    if (!payrollCategory) {
+      payrollCategory = await prisma.expenseCategory.create({
+        data: {
+          name: 'Employee Salaries',
+          description: 'Daily employee salary allocations (Monthly salary ÷ 30 days)',
+          type: 'PAYROLL'
+        }
+      })
+    }
+
+    // Calculate daily salary allocation (monthly salary / 30 days)
+    // This is the restaurant industry standard for daily costing
+    let totalDailySalaryExpense = 0
+    const salaryExpenses = []
+
+    for (const employee of activeEmployees) {
+      const dailySalary = Math.round((employee.salary / 30) * 100) / 100 // Round to 2 decimal places
+      totalDailySalaryExpense += dailySalary
+
+      salaryExpenses.push({
+        expenseCategoryId: payrollCategory.id,
+        description: `Daily salary allocation - ${employee.user.name} (${employee.position})`,
+        amount: dailySalary,
+        expenseDate: date,
+        status: 'APPROVED' as ExpenseStatus
+      })
+    }
+
+    // Create the expense records in a single transaction
+    await prisma.$transaction(async (tx) => {
+      await tx.expense.createMany({
+        data: salaryExpenses
+      })
+    })
+
+    return { 
+      success: true, 
+      message: `Daily salary expenses recorded: ${activeEmployees.length} employees, $${totalDailySalaryExpense.toFixed(2)} total`,
+      totalAmount: totalDailySalaryExpense,
+      employeeCount: activeEmployees.length,
+      breakdown: salaryExpenses.map(exp => ({
+        employee: exp.description,
+        amount: exp.amount
+      }))
+    }
+  } catch (error) {
+    console.error('Error recording daily salary expenses:', error)
+    return { success: false, error: 'Failed to record daily salary expenses' }
+  }
+}
+
 // Automated Expense Creation
 export async function createPayrollExpense(payrollId: string) {
   try {
@@ -389,7 +498,7 @@ export async function getExpenseAnalytics(period: {
         SUM(e.amount)::FLOAT as total_amount,
         COUNT(e.id)::INT as expense_count
       FROM expenses e
-      JOIN expense_categories ec ON e.expense_category_id = ec.id
+      JOIN expense_categories ec ON e."expenseCategoryId" = ec.id
       WHERE e.expense_date >= ${period.startDate}
         AND e.expense_date <= ${period.endDate}
         AND e.status = 'APPROVED'
@@ -472,7 +581,7 @@ export async function getBalanceSheetData(asOfDate: Date) {
         ec.type,
         SUM(e.amount)::FLOAT as total_amount
       FROM expenses e
-      JOIN expense_categories ec ON e.expense_category_id = ec.id
+      JOIN expense_categories ec ON e."expenseCategoryId" = ec.id
       WHERE e.expense_date <= ${asOfDate}
         AND e.status = 'APPROVED'
       GROUP BY ec.type

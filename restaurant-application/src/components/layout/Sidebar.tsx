@@ -10,13 +10,16 @@ import {
   FileText,
   Clock,
   ChefHat,
-  Calculator
+  Calculator,
+  Activity
 } from 'lucide-react'
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: Home },
+  { name: 'Daily Operations', href: '/operations', icon: Clock },
   { name: 'Financial Management', href: '/financial-management', icon: Calculator },
   { name: 'Inventory', href: '/inventory', icon: Package },
+  { name: 'Stock Usage', href: '/inventory/usage', icon: Activity },
   { name: 'Orders', href: '/orders', icon: ShoppingCart },
   { name: 'Menu', href: '/menu', icon: ChefHat },
   { name: 'Employees', href: '/employees', icon: Users },

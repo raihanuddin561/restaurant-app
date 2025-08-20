@@ -1,7 +1,7 @@
 import { Package, ArrowLeft } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
 import Link from 'next/link'
-import { InventoryForm } from './components/InventoryForm'
+import InventoryForm from './components/InventoryForm'
 import { UnitInputGuide } from '../components/UnitInputGuide'
 import { QuickAddMultiple } from './components/QuickAddMultiple'
 
