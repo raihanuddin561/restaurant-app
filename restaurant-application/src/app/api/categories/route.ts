@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { requireEmployee, requireManager, type AuthenticatedRequest } from '@/lib/api-protection'
 
-export async function GET() {
+// GET /api/categories - Get all categories (All authenticated users)
+async function getCategoriesHandler(request: AuthenticatedRequest) {
   try {
     const categories = await prisma.category.findMany({
       orderBy: {
@@ -19,7 +21,8 @@ export async function GET() {
   }
 }
 
-export async function POST(request: NextRequest) {
+// POST /api/categories - Create category (Manager+ only)
+async function createCategoryHandler(request: AuthenticatedRequest) {
   try {
     const body = await request.json()
     const { name } = body
@@ -37,6 +40,16 @@ export async function POST(request: NextRequest) {
       }
     })
 
+    // Log security event
+    await prisma.securityLog.create({
+      data: {
+        eventType: 'CATEGORY_CREATED',
+        description: `Category "${name}" created by ${request.user.email}`,
+        userId: request.user.id,
+        ipAddress: request.headers.get('x-forwarded-for') || 'unknown'
+      }
+    })
+
     return NextResponse.json(category, { status: 201 })
   } catch (error) {
     console.error('Error creating category:', error)
@@ -46,3 +59,7 @@ export async function POST(request: NextRequest) {
     )
   }
 }
+
+// Apply authentication protection
+export const GET = requireEmployee(getCategoriesHandler)
+export const POST = requireManager(createCategoryHandler)

@@ -121,6 +121,45 @@ export async function deleteExpense(id: string) {
   }
 }
 
+export async function getExpenseById(id: string) {
+  try {
+    const expense = await prisma.expense.findUnique({
+      where: { id },
+      include: {
+        expenseCategory: true,
+        payroll: {
+          include: {
+            employee: {
+              include: {
+                user: true
+              }
+            }
+          }
+        },
+        employee: {
+          include: {
+            user: true
+          }
+        },
+        purchase: {
+          include: {
+            supplier: true
+          }
+        }
+      }
+    })
+
+    if (!expense) {
+      return { success: false, error: 'Expense not found' }
+    }
+
+    return { success: true, expense }
+  } catch (error) {
+    console.error('Error fetching expense by ID:', error)
+    return { success: false, error: 'Failed to fetch expense' }
+  }
+}
+
 export async function getExpenses(filters?: {
   categoryId?: string
   type?: ExpenseType

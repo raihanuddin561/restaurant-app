@@ -30,6 +30,7 @@ model User {
   createdSales    Sale[]
   inventoryLogs   InventoryLog[]
   stockUsage      StockUsage[]  // Track who recorded stock usage
+  securityLogs    SecurityLog[]
 
   @@map("users")
 }
@@ -566,4 +567,21 @@ enum ReportType {
   QUARTERLY
   YEARLY
   CUSTOM
+}
+
+// Security & Audit Logging
+model SecurityLog {
+  id          String   @id @default(cuid())
+  userId      String?
+  eventType   String   // LOGIN, LOGOUT, CREATE_USER, DELETE_USER, PASSWORD_CHANGE, etc.
+  description String
+  ipAddress   String?
+  userAgent   String?
+  metadata    Json?    // Additional context data
+  createdAt   DateTime @default(now())
+
+  // Relations
+  user        User?    @relation(fields: [userId], references: [id])
+
+  @@map("security_logs")
 }

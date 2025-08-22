@@ -219,7 +219,7 @@ export async function getDailyCosts(date: Date) {
 
     // Stock usage costs (recipe ingredients, wastage)
     const stockUsage = await prisma.stockUsage.groupBy({
-      by: ['usageType'],
+      by: ['reason'],
       where: {
         usageDate: {
           gte: startOfDay,

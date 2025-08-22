@@ -22,6 +22,7 @@ interface OrderItem {
   menuItemId: string
   name: string
   price: number
+  unitPrice: number
   quantity: number
   totalPrice: number
   notes?: string
@@ -86,6 +87,7 @@ export default function NewOrderPage() {
   const [customerName, setCustomerName] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
   const [notes, setNotes] = useState('')
+  const [loading, setLoading] = useState(false)
   const { showNotification, notification, clearNotification } = useNotification()
 
   // Filter menu items
@@ -120,6 +122,7 @@ export default function NewOrderPage() {
         menuItemId: menuItem.id,
         name: menuItem.name,
         price: menuItem.price,
+        unitPrice: menuItem.price,
         quantity: 1,
         totalPrice: menuItem.price
       }])
@@ -145,22 +148,87 @@ export default function NewOrderPage() {
   }
 
   // Submit order
-  const submitOrder = () => {
-    const orderData = {
-      orderType,
-      tableNumber: orderType === 'DINE_IN' ? tableNumber : null,
-      customerName: orderType !== 'DINE_IN' ? customerName : null,
-      customerPhone: orderType !== 'DINE_IN' ? customerPhone : null,
-      items: orderItems,
-      subtotal,
-      taxAmount,
-      total,
-      notes
+  const submitOrder = async () => {
+    if (orderItems.length === 0) {
+      showNotification('error', 'Please add at least one item to the order.', 'Invalid Order')
+      return
     }
-    
-    console.log('Submitting order:', orderData)
-    // TODO: Submit to API
-    showNotification('success', 'Order submitted successfully! The order has been sent to the kitchen.', 'Order Confirmed')
+
+    if (!orderType) {
+      showNotification('error', 'Please select an order type.', 'Invalid Order')
+      return
+    }
+
+    if (orderType === 'DINE_IN' && !tableNumber) {
+      showNotification('error', 'Please specify a table number for dine-in orders.', 'Invalid Order')
+      return
+    }
+
+    if (orderType !== 'DINE_IN' && !customerName) {
+      showNotification('error', 'Please provide customer name for takeaway/delivery orders.', 'Invalid Order')
+      return
+    }
+
+    setLoading(true)
+
+    try {
+      const orderData = {
+        userId: 'current-user-id', // TODO: Get from session/auth
+        orderType,
+        tableNumber: orderType === 'DINE_IN' ? tableNumber : null,
+        customerName: orderType !== 'DINE_IN' ? customerName : null,
+        customerPhone: orderType !== 'DINE_IN' ? customerPhone : null,
+        totalAmount: subtotal,
+        taxAmount,
+        finalAmount: total,
+        notes,
+        orderItems: orderItems.map(item => ({
+          menuItemId: item.menuItemId,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          totalPrice: item.totalPrice,
+          notes: null
+        }))
+      }
+      
+      console.log('Submitting order:', orderData)
+      
+      const response = await fetch('/api/orders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(orderData)
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to create order')
+      }
+
+      const result = await response.json()
+      
+      showNotification('success', `Order #${result.orderNumber} created successfully! The order has been sent to the kitchen.`, 'Order Confirmed')
+      
+      // Reset form after successful submission
+      setOrderItems([])
+      setOrderType('')
+      setTableNumber('')
+      setCustomerName('')
+      setCustomerPhone('')
+      setNotes('')
+      
+      // Optionally redirect to orders page
+      setTimeout(() => {
+        window.location.href = '/orders'
+      }, 2000)
+      
+    } catch (error) {
+      console.error('Error creating order:', error)
+      showNotification('error', error instanceof Error ? error.message : 'Failed to create order. Please try again.', 'Order Creation Failed')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (

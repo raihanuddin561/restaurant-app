@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { updateExpense, deleteExpense } from '@/app/actions/expenses'
+import { getExpenseById, updateExpense, deleteExpense } from '@/app/actions/expenses'
 
 export async function GET(
   request: NextRequest,
@@ -7,8 +7,16 @@ export async function GET(
 ) {
   try {
     const { id } = params
-    // You would need to implement getExpenseById in your actions if needed
-    return NextResponse.json({ message: 'Get single expense not implemented yet' })
+    const result = await getExpenseById(id)
+
+    if (!result.success) {
+      return NextResponse.json(
+        { error: result.error },
+        { status: result.error === 'Expense not found' ? 404 : 500 }
+      )
+    }
+
+    return NextResponse.json(result.expense)
   } catch (error) {
     console.error('Error fetching expense:', error)
     return NextResponse.json(

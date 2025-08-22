@@ -40,4 +40,37 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# database
+*.db
+*.db-journal
+/prisma/*.db
+/prisma/*.db-journal
+
+# temporary files
+*.tmp
+*.temp
+/temp/
+/tmp/
+
+# logs
+logs/
+*.log
+
+# development scripts and test files
+add-*.js
+add-*.mjs
+check-*.js
+check-*.mjs
+test-*.js
+test-*.mjs
+clean-*.js
+fix-*.js
+migrate-*.js
+seed-*.js
+verify-*.js
+import-*.js
+export-*.js
+data-backup.json
+query
+
 /src/generated/prisma

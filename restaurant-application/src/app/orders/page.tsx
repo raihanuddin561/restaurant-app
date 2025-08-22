@@ -1,3 +1,6 @@
+'use client'
+
+import { useState, useEffect } from 'react'
 import { 
   Plus, 
   Search, 
@@ -15,74 +18,37 @@ import {
   Utensils
 } from 'lucide-react'
 import { formatCurrency, formatDateTime } from '@/lib/utils'
-import { prisma } from '@/lib/prisma'
+import { deleteOrder, getOrdersWithStats } from '@/app/actions/orders'
 import Link from 'next/link'
 
-// Get orders data from database
-async function getOrdersData() {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const tomorrow = new Date(today)
-  tomorrow.setDate(tomorrow.getDate() + 1)
-
-  try {
-    const [orders, todayStats] = await Promise.all([
-      // Get all orders with related data
-      prisma.order.findMany({
-        include: {
-          user: {
-            select: {
-              name: true
-            }
-          },
-          orderItems: {
-            include: {
-              menuItem: {
-                select: {
-                  name: true,
-                  price: true
-                }
-              },
-              item: {
-                select: {
-                  name: true,
-                  sellingPrice: true
-                }
-              }
-            }
-          }
-        },
-        orderBy: {
-          createdAt: 'desc'
-        }
-      }),
-
-      // Get today's statistics
-      prisma.order.aggregate({
-        where: {
-          createdAt: {
-            gte: today,
-            lt: tomorrow
-          }
-        },
-        _count: {
-          id: true
-        },
-        _sum: {
-          finalAmount: true
-        }
-      })
-    ])
-
-    return { 
-      orders, 
-      todayOrdersCount: todayStats._count.id || 0,
-      todayRevenue: todayStats._sum.finalAmount || 0
-    }
-  } catch (error) {
-    console.error('Orders data fetch error:', error)
-    return { orders: [], todayOrdersCount: 0, todayRevenue: 0 }
+interface OrderData {
+  id: string
+  orderNumber: string
+  orderType: string
+  status: string
+  tableNumber?: string | null
+  customerId?: string | null
+  customerName?: string | null
+  totalAmount: number
+  taxAmount: number
+  discountAmount: number
+  finalAmount: number
+  createdAt: Date
+  user: {
+    name: string
   }
+  orderItems: Array<{
+    id: string
+    quantity: number
+    menuItem?: {
+      name: string
+      price: number
+    } | null
+    item?: {
+      name: string
+      sellingPrice: number
+    } | null
+  }>
 }
 
 // Helper function to get status badge style
@@ -114,14 +80,95 @@ function getStatusIcon(status: string) {
   return <IconComponent className="h-4 w-4" />
 }
 
-export default async function OrdersPage() {
-  const { orders, todayOrdersCount, todayRevenue } = await getOrdersData()
+export default function OrdersPage() {
+  const [orders, setOrders] = useState<OrderData[]>([])
+  const [todayOrdersCount, setTodayOrdersCount] = useState(0)
+  const [todayRevenue, setTodayRevenue] = useState(0)
+  const [statusCounts, setStatusCounts] = useState<Record<string, number>>({})
+  const [loading, setLoading] = useState(true)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [typeFilter, setTypeFilter] = useState('all')
+  const [deleting, setDeleting] = useState<string | null>(null)
 
-  // Calculate additional statistics
+  // Load orders data
+  useEffect(() => {
+    loadOrders()
+  }, [])
+
+  const loadOrders = async () => {
+    try {
+      setLoading(true)
+      const result = await getOrdersWithStats()
+      
+      if (result.success) {
+        setOrders(result.orders as OrderData[])
+        setTodayOrdersCount(result.todayOrdersCount)
+        setTodayRevenue(result.todayRevenue)
+        setStatusCounts(result.statusCounts)
+      }
+    } catch (error) {
+      console.error('Error loading orders:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Handle delete order
+  const handleDeleteOrder = async (orderId: string) => {
+    if (!confirm('Are you sure you want to delete this order? This action cannot be undone.')) {
+      return
+    }
+
+    setDeleting(orderId)
+    try {
+      const result = await deleteOrder(orderId)
+      
+      if (result.success) {
+        // Remove order from local state
+        setOrders(orders.filter(order => order.id !== orderId))
+        // Reload to get updated stats
+        loadOrders()
+        alert('Order deleted successfully!')
+      } else {
+        alert(`Failed to delete order: ${result.error || 'Unknown error'}`)
+      }
+    } catch (error) {
+      console.error('Error deleting order:', error)
+      alert(`Failed to delete order: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    } finally {
+      setDeleting(null)
+    }
+  }
+
+  // Filter orders
+  const filteredOrders = orders.filter(order => {
+    const matchesSearch = searchTerm === '' || 
+      order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      order.user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (order.customerName && order.customerName.toLowerCase().includes(searchTerm.toLowerCase()))
+
+    const matchesStatus = statusFilter === 'all' || order.status === statusFilter
+    const matchesType = typeFilter === 'all' || order.orderType === typeFilter
+
+    return matchesSearch && matchesStatus && matchesType
+  })
+
+  // Calculate statistics from current orders
   const pendingOrders = orders.filter(order => order.status === 'PENDING').length
   const preparingOrders = orders.filter(order => order.status === 'PREPARING').length
   const readyOrders = orders.filter(order => order.status === 'READY').length
-  const totalOrders = orders.length
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-2 text-sm text-gray-600">Loading orders...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -208,12 +255,12 @@ export default async function OrdersPage() {
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-7">
             {[
               { status: 'PENDING', count: pendingOrders, label: 'Pending' },
-              { status: 'CONFIRMED', count: orders.filter(o => o.status === 'CONFIRMED').length, label: 'Confirmed' },
+              { status: 'CONFIRMED', count: statusCounts.CONFIRMED || 0, label: 'Confirmed' },
               { status: 'PREPARING', count: preparingOrders, label: 'Preparing' },
               { status: 'READY', count: readyOrders, label: 'Ready' },
-              { status: 'SERVED', count: orders.filter(o => o.status === 'SERVED').length, label: 'Served' },
-              { status: 'COMPLETED', count: orders.filter(o => o.status === 'COMPLETED').length, label: 'Completed' },
-              { status: 'CANCELLED', count: orders.filter(o => o.status === 'CANCELLED').length, label: 'Cancelled' }
+              { status: 'SERVED', count: statusCounts.SERVED || 0, label: 'Served' },
+              { status: 'COMPLETED', count: statusCounts.COMPLETED || 0, label: 'Completed' },
+              { status: 'CANCELLED', count: statusCounts.CANCELLED || 0, label: 'Cancelled' }
             ].map((item) => (
               <div key={item.status} className="text-center">
                 <div className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-medium ${getStatusBadgeStyle(item.status)}`}>
@@ -238,6 +285,8 @@ export default async function OrdersPage() {
             <input
               type="text"
               placeholder="Search orders..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
               className="block w-full rounded-md border-0 py-1.5 pl-10 pr-3 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
             />
           </div>
@@ -245,7 +294,11 @@ export default async function OrdersPage() {
           {/* Status Filter */}
           <div className="flex items-center gap-2">
             <Filter className="h-4 w-4 text-gray-400" />
-            <select className="rounded-md border-0 py-1.5 pl-3 pr-8 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6">
+            <select 
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="rounded-md border-0 py-1.5 pl-3 pr-8 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
+            >
               <option value="all">All Status</option>
               <option value="PENDING">Pending</option>
               <option value="CONFIRMED">Confirmed</option>
@@ -258,7 +311,11 @@ export default async function OrdersPage() {
           </div>
 
           {/* Order Type Filter */}
-          <select className="rounded-md border-0 py-1.5 pl-3 pr-8 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6">
+          <select 
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value)}
+            className="rounded-md border-0 py-1.5 pl-3 pr-8 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-blue-600 sm:text-sm sm:leading-6"
+          >
             <option value="all">All Types</option>
             <option value="DINE_IN">Dine In</option>
             <option value="TAKEAWAY">Takeaway</option>
@@ -282,7 +339,7 @@ export default async function OrdersPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200 bg-white">
-            {orders.map((order) => (
+            {filteredOrders.map((order) => (
               <tr key={order.id} className="hover:bg-gray-50">
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center">
@@ -297,7 +354,7 @@ export default async function OrdersPage() {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm text-gray-900">
-                    {order.customerId ? 'Customer ID: ' + order.customerId : 'Walk-in'}
+                    {order.customerId ? 'Customer ID: ' + order.customerId : (order.customerName || 'Walk-in')}
                   </div>
                   <div className="text-sm text-gray-500">Staff: {order.user.name}</div>
                 </td>
@@ -342,16 +399,23 @@ export default async function OrdersPage() {
                     <Link 
                       href={`/orders/${order.id}`}
                       className="text-blue-600 hover:text-blue-900"
+                      title="View Details"
                     >
                       <Eye className="h-4 w-4" />
                     </Link>
                     <Link 
                       href={`/orders/${order.id}/edit`}
                       className="text-yellow-600 hover:text-yellow-900"
+                      title="Edit Order"
                     >
                       <Edit className="h-4 w-4" />
                     </Link>
-                    <button className="text-red-600 hover:text-red-900">
+                    <button 
+                      onClick={() => handleDeleteOrder(order.id)}
+                      disabled={deleting === order.id}
+                      className="text-red-600 hover:text-red-900 disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Delete Order"
+                    >
                       <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
@@ -362,12 +426,15 @@ export default async function OrdersPage() {
         </table>
       </div>
 
-      {orders.length === 0 && (
+      {filteredOrders.length === 0 && (
         <div className="text-center py-12">
           <ShoppingCart className="mx-auto h-12 w-12 text-gray-400" />
           <h3 className="mt-2 text-sm font-semibold text-gray-900">No orders found</h3>
           <p className="mt-1 text-sm text-gray-500">
-            Get started by creating your first order.
+            {searchTerm || statusFilter !== 'all' || typeFilter !== 'all' 
+              ? 'Try adjusting your search or filters.'
+              : 'Get started by creating your first order.'
+            }
           </p>
           <div className="mt-6">
             <Link

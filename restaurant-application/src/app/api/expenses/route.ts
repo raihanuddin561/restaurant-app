@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getExpenses, createExpense } from '@/app/actions/expenses'
+import { requireApiAuth } from '@/lib/auth-utils'
+import { UserRole } from '@prisma/client'
 
 export async function GET(request: NextRequest) {
   try {
+    // Require authentication - all roles can view expenses but only Manager+ can see detailed info
+    const { user, response } = await requireApiAuth(request)
+    if (response) return response
+
     const { searchParams } = new URL(request.url)
     const categoryId = searchParams.get('categoryId')
     const type = searchParams.get('type')
@@ -39,6 +45,10 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    // Require Manager or Admin role to create expenses
+    const { user, response } = await requireApiAuth(request, [UserRole.ADMIN, UserRole.MANAGER])
+    if (response) return response
+
     const data = await request.json()
     
     // Convert date strings to Date objects

@@ -659,7 +659,8 @@ export async function deleteInventoryItem(itemId: string) {
         inventoryLogs: true,
         purchaseItems: true,
         orderItems: true,
-        menuItems: true
+        recipeItems: true,
+        stockUsage: true
       }
     })
 
@@ -682,9 +683,10 @@ export async function deleteInventoryItem(itemId: string) {
     const hasInventoryLogs = existingItem.inventoryLogs.length > 0
     const hasPurchases = existingItem.purchaseItems.length > 0
     const hasOrders = existingItem.orderItems.length > 0
-    const hasMenuItems = existingItem.menuItems.length > 0
+    const hasRecipeItems = existingItem.recipeItems.length > 0
+    const hasStockUsage = existingItem.stockUsage.length > 0
     
-    const hasRelatedRecords = hasInventoryLogs || hasPurchases || hasOrders || hasMenuItems
+    const hasRelatedRecords = hasInventoryLogs || hasPurchases || hasOrders || hasRecipeItems || hasStockUsage
 
     if (hasRelatedRecords) {
       // Soft delete - mark as inactive instead of hard delete
@@ -727,7 +729,8 @@ export async function deleteInventoryItem(itemId: string) {
         hasInventoryLogs && `${existingItem.inventoryLogs.length} inventory logs`,
         hasPurchases && `${existingItem.purchaseItems.length} purchase records`,
         hasOrders && `${existingItem.orderItems.length} order items`,
-        hasMenuItems && `${existingItem.menuItems.length} menu connections`
+        hasRecipeItems && `${existingItem.recipeItems.length} recipe connections`,
+        hasStockUsage && `${existingItem.stockUsage.length} stock usage records`
       ].filter(Boolean).join(', ')
 
       return { 
